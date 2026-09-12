@@ -352,9 +352,11 @@ fixture "$(
   line '$1' 1000 main
   line '$2' 2000 other
 )"
+# Default set is `sans` (U+278A..), which falls back to a Latin font and so
+# draws a fuller circle than the CJK-backed dingbat set.
 out=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_current_position=inline "${LIST}" '$9')
-contains "$out" "$(printf '\342\235\266')"
-contains "$out" "$(printf '\342\235\267')"
+contains "$out" "$(printf '\342\236\212')"
+contains "$out" "$(printf '\342\236\213')"
 
 it "the glyph badge draws no extra caps, so the pill stays one cap pair"
 out=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_current_position=inline "${LIST}" '$9')
@@ -378,3 +380,32 @@ it "ts_badge_glyph refuses anything outside 1..9"
 status 1 ts_badge_glyph 0
 status 1 ts_badge_glyph 10
 status 1 ts_badge_glyph x
+
+it "each glyph set emits its own codepoints"
+fixture "$(line '$1' 1000 main)"
+d=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=dingbat \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+n=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=sans \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+o=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=outline \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+contains "$d" "$(printf '\342\235\266')"
+contains "$n" "$(printf '\342\236\212')"
+contains "$o" "$(printf '\342\221\240')"
+
+it "an unknown set falls back to dingbat rather than losing the digit"
+u=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=nonsense \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+contains "$u" "$(printf '\342\235\266')"
+
+it "every set covers 1..9 and refuses the rest"
+for set in dingbat sans outline; do
+  for n in 1 2 3 4 5 6 7 8 9; do
+    if [ -z "$(ts_badge_glyph "$n" "$set")" ]; then
+      fail "$set has no glyph for $n"
+      break 2
+    fi
+  done
+  if ts_badge_glyph 10 "$set" >/dev/null 2>&1; then fail "$set accepted 10"; break; fi
+  [ "$set" = outline ] && pass
+done

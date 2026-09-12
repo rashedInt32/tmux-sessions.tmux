@@ -50,7 +50,9 @@ badge_pad=$(ts_opt sessions_badge_pad 1)
 # `glyph` uses a real circled-digit character, which has margin on every side
 # including above and below -- but relies on terminal font fallback.
 badge_style=$(ts_opt sessions_badge_style pill)
-circle_color=$(ts_opt sessions_circle_color '#ffffff')
+circle_color=$(ts_opt sessions_circle_color '#131314')
+# dingbat (small, CJK fallback) | sans (larger, Latin fallback) | outline
+circle_set=$(ts_opt sessions_circle_set sans)
 
 fmt=$(ts_opt sessions_format '#[fg=#f5d76e]%d#[fg=#9f9ca6] %s#[default]')
 cur_fmt=$(ts_opt sessions_current_format '#[fg=#7fe08a]%d %s#[default]')
@@ -205,7 +207,7 @@ for r in $rows; do
     # blob on a light background.
     if [ "${badge}" = 'on' ] && [ "${is_current}" != yes ] && [ "${badge_style}" = 'glyph' ] &&
       g=$(ts_pill_glyph "${idx}" "${label}" "${color}" "${pill_fg}" \
-        "$(ts_badge_color "${circle_color}" "${color}" "${pill_fg}")"); then
+        "$(ts_badge_color "${circle_color}" "${color}" "${pill_fg}")" "${circle_set}"); then
       # Only indices 1..9 have a glyph; anything else falls through to the
       # nested-cap badge rather than losing its number.
       append "$g"

@@ -154,45 +154,88 @@ ts_pill_badge() {
     "$3" "${TS_CAP_RIGHT}"
 }
 
-# The index as a single circled-digit glyph: U+2776..U+277E.
+# The index as a single circled-digit glyph.
 #
-#   ts_badge_glyph 3   ->  the character for a filled circle containing 3
+#   ts_badge_glyph <1..9> [set]
 #
 # This is the only way to get what a nested cap pair cannot: a real circle with
 # margin on every side, including above and below. The margin is drawn into the
-# glyph itself, so it does not need sub-cell geometry the terminal has not got.
+# glyph itself, so it needs no sub-cell geometry the terminal has not got.
 #
-# JetBrainsMono Nerd Font does not carry these -- its cmap has 6860 codepoints
-# and no enclosed digits at all -- but 45 other fonts on this machine do, and
-# the terminal falls back per glyph. That fallback is the whole mechanism, so
-# `@sessions_badge_style glyph` is opt-in: on a machine with no such font it
-# would render as tofu.
+# JetBrainsMono Nerd Font carries none of these -- 6860 codepoints, not one
+# enclosed digit -- but other fonts on the machine do and the terminal falls
+# back per glyph. Which font it lands on decides how the circle looks, and the
+# sets differ sharply because they resolve to different families:
 #
-# The glyph is a knockout: the circle takes the foreground colour and the digit
-# shows whatever is behind it. So fg is the circle, bg is the digit.
+#   dingbat  U+2776..  filled, 45 fonts, falls back to Hiragino Sans -- a CJK
+#                      family, so the circle is drawn small and tight in the cell
+#   sans     U+278A..  filled, 31 fonts, falls back to Arial Unicode MS -- a
+#                      Latin family, so the circle fills more of the cell
+#   outline  U+2460..  hollow, 56 fonts, digit in the circle colour rather than
+#                      knocked out
+#
+# `sans` is the bigger circle; `dingbat` the tighter one. Neither can be scaled,
+# since a terminal has one font size per cell.
+#
+# Filled sets are knockouts: the circle takes the foreground colour and the
+# digit shows whatever is behind it, so the digit comes out in the pill's own
+# colour. A white circle therefore gives a pale digit in a pastel; a dark circle
+# gives the digit in the pill's bright colour, which is far more legible.
 #
 # Written as octal so the codepoints cannot be mangled in transit, the same way
 # the caps were lost once already.
 ts_badge_glyph() {
-  case "$1" in
-  1) printf '\342\235\266' ;;
-  2) printf '\342\235\267' ;;
-  3) printf '\342\235\270' ;;
-  4) printf '\342\235\271' ;;
-  5) printf '\342\235\272' ;;
-  6) printf '\342\235\273' ;;
-  7) printf '\342\235\274' ;;
-  8) printf '\342\235\275' ;;
-  9) printf '\342\235\276' ;;
-  *) return 1 ;;
+  case "${2:-dingbat}" in
+  sans)
+    case "$1" in
+    1) printf '\342\236\212' ;;
+    2) printf '\342\236\213' ;;
+    3) printf '\342\236\214' ;;
+    4) printf '\342\236\215' ;;
+    5) printf '\342\236\216' ;;
+    6) printf '\342\236\217' ;;
+    7) printf '\342\236\220' ;;
+    8) printf '\342\236\221' ;;
+    9) printf '\342\236\222' ;;
+    *) return 1 ;;
+    esac
+    ;;
+  outline)
+    case "$1" in
+    1) printf '\342\221\240' ;;
+    2) printf '\342\221\241' ;;
+    3) printf '\342\221\242' ;;
+    4) printf '\342\221\243' ;;
+    5) printf '\342\221\244' ;;
+    6) printf '\342\221\245' ;;
+    7) printf '\342\221\246' ;;
+    8) printf '\342\221\247' ;;
+    9) printf '\342\221\250' ;;
+    *) return 1 ;;
+    esac
+    ;;
+  *)
+    case "$1" in
+    1) printf '\342\235\266' ;;
+    2) printf '\342\235\267' ;;
+    3) printf '\342\235\270' ;;
+    4) printf '\342\235\271' ;;
+    5) printf '\342\235\272' ;;
+    6) printf '\342\235\273' ;;
+    7) printf '\342\235\274' ;;
+    8) printf '\342\235\275' ;;
+    9) printf '\342\235\276' ;;
+    *) return 1 ;;
+    esac
+    ;;
   esac
 }
 
 # Pill with a real circled-digit glyph as the badge.
 #
-#   ts_pill_glyph <index> <label> <pill> <text-fg> <circle>
+#   ts_pill_glyph <index> <label> <pill> <text-fg> <circle> [set]
 ts_pill_glyph() {
-  ts_glyph__g=$(ts_badge_glyph "$1") || return 1
+  ts_glyph__g=$(ts_badge_glyph "$1" "${6:-dingbat}") || return 1
   printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s,bold]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
     "$3" "${TS_CAP_LEFT}" \
     "$5" "$3" "${ts_glyph__g}" \

@@ -3,6 +3,8 @@
 Your tmux sessions, numbered, in the status bar. `<prefix>` then a digit jumps to
 one — from any pane, whatever is running in it.
 
+https://github.com/user-attachments/assets/6f3a03b5-5e2f-4508-ab7e-acad3eae751c
+
 ```
  ( 4 packages )        ( 1 main )  ( 2 effective-tutorial )  ( 3 solo-effect )  ( 5 fiberWatch )
    status-left                              status-right

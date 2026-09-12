@@ -17,7 +17,10 @@ SWITCH="${dir}/scripts/switch.sh"
 # --------------------------------------------------------------- status bar
 
 if [ "$(ts_opt sessions_status on)" = 'on' ]; then
-  segment="#(${LIST} #{client_session})"
+  # #{client_width} lets the script trim the tail to fit. Without it tmux drops
+  # the whole of status-right the moment it will not fit beside status-left and
+  # the window list, so the list vanishes rather than shortening.
+  segment="#(${LIST} #{client_session} list #{client_width})"
   current=$(tmux show-option -gqv status-right || true)
   tmux set-option -g status-right "$(ts_merge_status "${current}" "${segment}" "${LIST}")"
 
@@ -25,9 +28,9 @@ if [ "$(ts_opt sessions_status on)" = 'on' ]; then
   # left out of the right-hand list so it is never shown twice. Appended, so
   # whatever else lives in status-left survives.
   if [ "$(ts_opt sessions_current_position left)" = 'left' ]; then
-    left_seg="#(${LIST} #{client_session} --current)"
+    left_seg="#(${LIST} #{client_session} current)"
     left_now=$(tmux show-option -gqv status-left || true)
-    tmux set-option -g status-left "$(ts_merge_status "${left_now}" "${left_seg}" "${LIST} #{client_session} --current")"
+    tmux set-option -g status-left "$(ts_merge_status "${left_now}" "${left_seg}" "${LIST} #{client_session} current")"
 
     grow_l=$(ts_grow_length "$(tmux show-option -gqv status-left-length || echo 0)" "$(ts_opt sessions_status_left_length 60)")
     if [ -n "${grow_l}" ]; then

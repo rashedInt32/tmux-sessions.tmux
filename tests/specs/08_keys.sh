@@ -67,7 +67,7 @@ it "sets status-right to our segment with the client's session"
 contains "$(cat "${STUB_LOG}")" 'set-option -g status-right #('
 
 it "passes #{client_session}, which is what makes the highlight per-client"
-contains "$(cat "${STUB_LOG}")" '#{client_session})'
+contains "$(cat "${STUB_LOG}")" '#{client_session} list'
 
 it "repaints immediately rather than waiting out status-interval"
 contains "$(cat "${STUB_LOG}")" "refresh-client -S"
@@ -131,7 +131,7 @@ it "places the current session's pill in status-left"
 contains "$(cat "${STUB_LOG}")" "set-option -g status-left"
 
 it "the left segment asks for only the current session"
-contains "$(cat "${STUB_LOG}")" '--current)'
+contains "$(cat "${STUB_LOG}")" 'current)'
 
 it "raises status-left-length too, since a pill is wider than a bare name"
 contains "$(cat "${STUB_LOG}")" "set-option -g status-left-length 60"
@@ -146,3 +146,13 @@ it "current_position = inline leaves status-left alone entirely"
 eq "0" "$(grep -c 'set-option -g status-left' "${STUB_LOG}" | tr -d ' ')"
 teardown_stub
 unset TS_OPT_sessions_current_position TS_OPT_sessions_hooks
+
+setup_stub
+TS_OPT_sessions_hooks=off
+export TS_OPT_sessions_hooks
+"${ENTRY}" >/dev/null 2>&1
+
+it "passes the client width, so the list can trim itself to fit"
+contains "$(cat "${STUB_LOG}")" '#{client_width})'
+teardown_stub
+unset TS_OPT_sessions_hooks

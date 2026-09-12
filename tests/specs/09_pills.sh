@@ -111,7 +111,7 @@ eq "1" "$(count_of "${CAP_L}" "${out}")"
 contains "$out" "3 dotfiles"
 
 it "--current uses the fixed current colour, not the hash"
-contains "$("${LIST}" '$32' --current)" "$(ts_opt sessions_current_color '#90b99f')"
+contains "$("${LIST}" '$32' --current)" '#ffffff'
 
 it "--current carries no overflow marker, which belongs to the list"
 not_contains "$(TS_OPT_sessions_max=1 "${LIST}" '$0' --current)" "+"
@@ -166,3 +166,65 @@ contains "$("${LIST}" 'nosuchsession')" "2 packages"
 
 it "an empty current marks nothing as current"
 eq "" "$("${LIST}" '' --current)"
+
+# ------------------------------------------------- fitting the client's width
+
+fixture "$(
+  line '$1' 1000 alpha-session
+  line '$2' 2000 beta-session
+  line '$3' 3000 gamma-session
+  line '$4' 4000 delta-session
+  line '$5' 5000 epsilon-session
+)"
+
+vis() { printf '%s' "$1" | sed 's/#\[[^]]*\]//g' | wc -m | tr -d ' '; }
+
+it "with no width given, nothing is dropped"
+eq "5" "$(count_of "${CAP_L}" "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9')")"
+
+it "a narrow client drops the tail instead of overflowing"
+out=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_reserve=10 "${LIST}" '$9' list 60)
+n=$(count_of "${CAP_L}" "$out")
+if [ "$n" -lt 5 ] && [ "$n" -ge 1 ]; then pass; else fail "expected some dropped, got $n pills"; fi
+
+it "what survives actually fits the budget"
+out=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_reserve=10 "${LIST}" '$9' list 60)
+w=$(vis "$out")
+if [ "$w" -le 50 ]; then pass; else fail "rendered $w cells into a 50 budget"; fi
+
+it "dropping for width still reports the count as +N"
+out=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_reserve=10 "${LIST}" '$9' list 60)
+contains "$out" "+"
+
+it "the bar never renders empty just because it is tight"
+# The failure this guards: tmux drops the whole of status-right when it will not
+# fit beside status-left and the window list, so the list vanished with no hint.
+out=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_reserve=10 "${LIST}" '$9' list 20)
+if [ -n "$out" ]; then pass; else fail "rendered nothing at all"; fi
+
+it "a wide client keeps every session"
+eq "5" "$(count_of "${CAP_L}" "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9' list 400)")"
+
+it "a non-numeric width is ignored rather than breaking arithmetic"
+eq "5" "$(count_of "${CAP_L}" "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9' list bogus)")"
+
+it "--current is never trimmed for width"
+contains "$("${LIST}" 'alpha-session' current 20)" "1 alpha-session"
+
+# ------------------------------------------------------------- the palette
+
+it "the palette is not the editor's oldworld colours"
+# Sharing a palette with lualine made the bar and the editor hard to tell apart.
+not_contains "${TS_PALETTE}" '#92a2d5'
+not_contains "${TS_PALETTE}" '#90b99f'
+
+it "the palette has ten entries, to cut collisions at five or six sessions"
+eq "10" "$(printf '%s' "${TS_PALETTE}" | wc -w | tr -d ' ')"
+
+it "colour follows the name, not the truncated label"
+# Otherwise changing name_width would reshuffle every colour on the bar.
+a=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_name_width=30 "${LIST}" '$9')
+b=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_name_width=6 "${LIST}" '$9')
+ca=$(printf '%s' "$a" | sed -n 's/^#\[fg=\([^,]*\).*/\1/p')
+cb=$(printf '%s' "$b" | sed -n 's/^#\[fg=\([^,]*\).*/\1/p')
+eq "$ca" "$cb"

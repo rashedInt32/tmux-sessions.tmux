@@ -17,8 +17,17 @@ TAB=$(printf '\t')
 TS_CAP_LEFT=$(printf '\356\202\266')
 TS_CAP_RIGHT=$(printf '\356\202\264')
 
-# The oldworld colours the user's lualine already uses for its own pills.
-TS_PALETTE='#92a2d5 #90b99f #e29eca #f5a191 #aca1cf #85b5ba #e6b99d #ea83a5'
+# Bright, saturated colours, deliberately NOT the editor's palette.
+#
+# The first version reused oldworld's muted tones, which is what lualine uses
+# inside nvim. Sharing a palette across the editor and the bar below it makes
+# the two hard to tell apart at a glance -- the bar should read as a different
+# surface, not as more editor. These are vivid enough to separate from each
+# other and from anything nvim draws, and all take dark text legibly.
+#
+# Ten rather than eight, because collisions scale with the square of the session
+# count and five or six sessions is normal.
+TS_PALETTE='#ff6188 #fc9867 #ffd866 #a9dc76 #78dce8 #ab9df2 #ff79c6 #7bd88f #f8a5c2 #6ec7ff'
 
 # Pick a palette colour for a name. Deterministic, not random.
 #
@@ -57,6 +66,15 @@ ts_color_for() {
 ts_pill() {
   printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
     "$2" "${TS_CAP_LEFT}" "$3" "$2" "$1" "$2" "${TS_CAP_RIGHT}"
+}
+
+# Visible width of a rendered segment: what it costs on screen once tmux has
+# consumed the #[...] directives.
+#
+# This is the number that matters for fitting. A pill is ~1400 bytes of escape
+# for ~20 cells of screen, so byte length is off by two orders of magnitude.
+ts_visible_width() {
+  printf '%s' "$1" | sed 's/#\[[^]]*\]//g' | wc -m | tr -d ' '
 }
 
 # Read a tmux user option, with a default.

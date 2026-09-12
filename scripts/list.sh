@@ -3,15 +3,15 @@
 #
 # Called from status-right as:
 #
-#   #(/path/to/list.sh #{client_session})
+#   #(/path/to/list.sh #{client_session} list #{client_width})
 #
 # and, when the current session lives on the left, from status-left as:
 #
-#   #(/path/to/list.sh #{client_session} --current)
+#   #(/path/to/list.sh #{client_session} current)
 #
-# tmux substitutes the format before running us, so $1 is the *client's* current
-# session. That is why the "you are here" highlight stays correct with more than
-# one client attached, which a hook computing `set -g status-right` could not be.
+# tmux substitutes the formats before running us, so $1 is the *client's*
+# current session and $3 is that client's width. $1 is a session NAME, not an
+# id -- see the match below.
 set -eu
 
 # shellcheck source=scripts/lib.sh
@@ -22,6 +22,10 @@ case "${2-}" in
 --current | current) mode=current ;;
 *) mode=list ;;
 esac
+client_width=${3-0}
+case "${client_width}" in
+'' | *[!0-9]*) client_width=0 ;;
+esac
 
 max=$(ts_opt sessions_max 9)
 width=$(ts_opt sessions_name_width 0)
@@ -31,53 +35,40 @@ position=$(ts_opt sessions_current_position left)
 
 palette=$(ts_opt sessions_colors "${TS_PALETTE}")
 pill_fg=$(ts_opt sessions_pill_fg '#131314')
-current_color=$(ts_opt sessions_current_color '#90b99f')
+current_color=$(ts_opt sessions_current_color '#ffffff')
 more_color=$(ts_opt sessions_more_color '#6c6874')
 
-# `plain` reproduces the pre-pill rendering exactly, for a terminal with no Nerd
-# Font. Those formats stay printf templates; the pill style computes its own.
 fmt=$(ts_opt sessions_format '#[fg=#f5d76e]%d#[fg=#9f9ca6] %s#[default]')
 cur_fmt=$(ts_opt sessions_current_format '#[fg=#7fe08a]%d %s#[default]')
 more_fmt=$(ts_opt sessions_more_format '#[fg=#6b6772]+%d#[default]')
 
-# Iterating a variable rather than a pipeline, because `... | while read` runs
-# the loop in a subshell and the accumulator would not survive it.
-sessions=$(ts_sessions)
+# Cells to leave for everything else on the bar. status-left and the window
+# list sit to our left and we cannot measure either from here, so this is a
+# reservation rather than a calculation.
+reserve=$(ts_opt sessions_reserve 34)
 
+NL='
+'
+
+# Pass 1 -- decide what each row would be, without rendering it yet, so the
+# widths are known before anything is committed to.
+rows=''
 total=0
 shown=0
-out=''
-
-append() {
-  if [ -z "${out}" ]; then
-    out=$1
-  else
-    out="${out}${sep}$1"
-  fi
-}
 
 OLDIFS=$IFS
-IFS='
-'
-for row in $sessions; do
-  if [ -z "$row" ]; then
-    continue
-  fi
+IFS=$NL
+for row in $(ts_sessions); do
+  [ -n "$row" ] || continue
 
   id=${row%%"${TAB}"*}
   name=${row#*"${TAB}"}
   name=${name#*"${TAB}"}
 
-  # A row we cannot trust is dropped before it counts, so it can neither be
-  # numbered nor inflate the `+N` overflow.
-  if ! ts_is_id "$id"; then
-    continue
-  fi
+  ts_is_id "$id" || continue
 
   total=$((total + 1))
-  if [ "$shown" -ge "$max" ]; then
-    continue
-  fi
+  [ "$shown" -lt "$max" ] || continue
   shown=$((shown + 1))
 
   # Matched against the id *or* the name on purpose. tmux's `#{client_session}`
@@ -90,9 +81,6 @@ for row in $sessions; do
     is_current=yes
   fi
 
-  # --current renders only the current session; the default list then leaves it
-  # out, so the two segments never show it twice. The numbering stays global, so
-  # the list keeps a gap where the current session was -- that gap is the point.
   if [ "${mode}" = 'current' ]; then
     [ "${is_current}" = yes ] || continue
   elif [ "${is_current}" = yes ] && [ "${position}" = 'left' ]; then
@@ -100,39 +88,101 @@ for row in $sessions; do
   fi
 
   label=$(ts_truncate "$name" "$width")
-  # Escape the name only, and after truncating: escaping first would let a cut
-  # land between a '##' pair and leave a live '#' for tmux to act on.
+  # Escape after truncating: escaping first would let a cut land between a '##'
+  # pair and leave a live '#' for tmux to act on.
   label=$(ts_escape "$label")
+
+  # The raw name rides along so the colour hashes from it, not from the
+  # truncated label: otherwise changing name_width would reshuffle every
+  # colour, and the whole point is that a session keeps its own.
+  rows="${rows}${shown}${TAB}${is_current}${TAB}${name}${TAB}${label}${NL}"
+done
+IFS=$OLDIFS
+
+# Pass 2 -- drop from the end until the segment fits the client.
+#
+# Without this the bar does not degrade, it disappears: tmux renders
+# status-right only if the whole thing fits beside status-left and the window
+# list, so one session too many takes the entire list off screen with no hint
+# why. Dropping the tail into the `+N` marker is the same behaviour as
+# sessions_max, just driven by the terminal rather than by configuration.
+hidden=$((total - shown))
+
+if [ "${mode}" != 'current' ] && [ "${client_width}" -gt 0 ]; then
+  budget=$((client_width - reserve))
+  [ "${budget}" -lt 10 ] && budget=10
+
+  # A pill costs its label plus four cells of chrome; plain costs the label plus
+  # the number and a space. Measure the real thing rather than guessing.
+  while [ -n "${rows}" ]; do
+    used=0
+    n=0
+    OLDIFS=$IFS
+    IFS=$NL
+    for r in $rows; do
+      [ -n "$r" ] || continue
+      idx=${r%%"${TAB}"*}
+      lbl=${r##*"${TAB}"}
+      n=$((n + 1))
+      used=$((used + $(printf '%s %s' "$idx" "$lbl" | wc -m | tr -d ' ') + 4))
+      [ "$n" -gt 1 ] && used=$((used + ${#sep}))
+    done
+    IFS=$OLDIFS
+    # Room for the `+N` pill too, when one will be shown.
+    [ "${hidden}" -gt 0 ] && used=$((used + 6 + ${#sep}))
+
+    [ "${used}" -le "${budget}" ] && break
+    [ "$n" -le 1 ] && break
+
+    # Drop the last row and count it as hidden instead.
+    rows=$(printf '%s' "${rows}" | sed '$d')
+    hidden=$((hidden + 1))
+  done
+fi
+
+# Pass 3 -- render what survived.
+out=''
+append() {
+  if [ -z "${out}" ]; then out=$1; else out="${out}${sep}$1"; fi
+}
+
+OLDIFS=$IFS
+IFS=$NL
+for r in $rows; do
+  [ -n "$r" ] || continue
+  idx=${r%%"${TAB}"*}
+  rest=${r#*"${TAB}"}
+  is_current=${rest%%"${TAB}"*}
+  rest=${rest#*"${TAB}"}
+  rawname=${rest%%"${TAB}"*}
+  label=${rest#*"${TAB}"}
 
   if [ "${style}" = 'plain' ]; then
     if [ "${is_current}" = yes ]; then
       # shellcheck disable=SC2059
-      append "$(printf "$cur_fmt" "$shown" "$label")"
+      append "$(printf "$cur_fmt" "$idx" "$label")"
     else
       # shellcheck disable=SC2059
-      append "$(printf "$fmt" "$shown" "$label")"
+      append "$(printf "$fmt" "$idx" "$label")"
     fi
   else
     if [ "${is_current}" = yes ]; then
       color=${current_color}
     else
-      color=$(ts_color_for "$name" "$palette")
+      color=$(ts_color_for "$rawname" "$palette")
     fi
-    append "$(ts_pill "${shown} ${label}" "${color}" "${pill_fg}")"
+    append "$(ts_pill "${idx} ${label}" "${color}" "${pill_fg}")"
   fi
 done
 IFS=$OLDIFS
 
 # The overflow marker belongs to the list, never to the single current pill.
-if [ "${mode}" != 'current' ]; then
-  hidden=$((total - shown))
-  if [ "$hidden" -gt 0 ]; then
-    if [ "${style}" = 'plain' ]; then
-      # shellcheck disable=SC2059
-      append "$(printf "$more_fmt" "$hidden")"
-    else
-      append "$(ts_pill "+${hidden}" "${more_color}" "${pill_fg}")"
-    fi
+if [ "${mode}" != 'current' ] && [ "${hidden}" -gt 0 ]; then
+  if [ "${style}" = 'plain' ]; then
+    # shellcheck disable=SC2059
+    append "$(printf "$more_fmt" "${hidden}")"
+  else
+    append "$(ts_pill "+${hidden}" "${more_color}" "${pill_fg}")"
   fi
 fi
 

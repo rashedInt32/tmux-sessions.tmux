@@ -21,9 +21,25 @@ if [ "$(ts_opt sessions_status on)" = 'on' ]; then
   current=$(tmux show-option -gqv status-right || true)
   tmux set-option -g status-right "$(ts_merge_status "${current}" "${segment}" "${LIST}")"
 
+  # The current session's pill goes on the left, where you look first, and is
+  # left out of the right-hand list so it is never shown twice. Appended, so
+  # whatever else lives in status-left survives.
+  if [ "$(ts_opt sessions_current_position left)" = 'left' ]; then
+    left_seg="#(${LIST} #{client_session} --current)"
+    left_now=$(tmux show-option -gqv status-left || true)
+    tmux set-option -g status-left "$(ts_merge_status "${left_now}" "${left_seg}" "${LIST} #{client_session} --current")"
+
+    grow_l=$(ts_grow_length "$(tmux show-option -gqv status-left-length || echo 0)" "$(ts_opt sessions_status_left_length 60)")
+    if [ -n "${grow_l}" ]; then
+      tmux set-option -g status-left-length "${grow_l}"
+    fi
+  fi
+
   # status-right-length defaults to 40, which silently cuts the tail off the
   # list. Raise it, but never lower a larger value the user already chose.
-  grow=$(ts_grow_length "$(tmux show-option -gqv status-right-length || echo 0)" "$(ts_opt sessions_status_length 200)")
+  # Pills cost four cells of chrome each, so the old 200 is tight with five
+  # sessions on screen.
+  grow=$(ts_grow_length "$(tmux show-option -gqv status-right-length || echo 0)" "$(ts_opt sessions_status_length 300)")
   if [ -n "${grow}" ]; then
     tmux set-option -g status-right-length "${grow}"
   fi

@@ -100,9 +100,14 @@ for spec in "${ROOT}"/tests/specs/*.sh; do
     *) continue ;;
     esac
   fi
-  # Each spec runs in this shell so assertions can bump the counters, but with
-  # its own fixture and options; clear them between files.
+  # Each spec runs in this shell so assertions can bump the counters, which
+  # means one spec's exported options would otherwise leak into the next. Clear
+  # every seam between files: a spec that passes alone and fails in the suite is
+  # worse than no spec.
   unset TMUX_SESSIONS_FIXTURE 2>/dev/null || true
+  for v in $(env | sed -n 's/^\(TS_OPT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+    unset "${v}" 2>/dev/null || true
+  done
   # shellcheck disable=SC1090
   . "${spec}"
 done

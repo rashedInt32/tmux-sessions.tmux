@@ -4,6 +4,13 @@
 
 LIST="${ROOT}/scripts/list.sh"
 
+# These specs describe the flat rendering, which `pill` is now the default over.
+# Pinning both keeps them a regression test for the plain style rather than
+# silently retargeting them at pills.
+TS_OPT_sessions_style=plain
+TS_OPT_sessions_current_position=inline
+export TS_OPT_sessions_style TS_OPT_sessions_current_position
+
 # Plain text rendering, so assertions read as what you see on the bar.
 TS_OPT_sessions_format='%d %s'
 TS_OPT_sessions_current_format='>%d %s'

@@ -7,6 +7,58 @@
 
 TAB=$(printf '\t')
 
+# Pill caps: U+E0B6 and U+E0B4, the half circles the user's lualine uses.
+#
+# Written as octal UTF-8 rather than as literal characters. These are Private
+# Use Area codepoints, and they were silently stripped in transit while this was
+# being prototyped -- producing square-ended pills with no error anywhere. Octal
+# escapes cannot be mangled that way. tests/specs/09_pills.sh asserts both caps
+# actually reach the rendered output.
+TS_CAP_LEFT=$(printf '\356\202\266')
+TS_CAP_RIGHT=$(printf '\356\202\264')
+
+# The oldworld colours the user's lualine already uses for its own pills.
+TS_PALETTE='#92a2d5 #90b99f #e29eca #f5a191 #aca1cf #85b5ba #e6b99d #ea83a5'
+
+# Pick a palette colour for a name. Deterministic, not random.
+#
+# "Random colours" means varied, not re-rolled: the bar re-renders on every hook
+# and every status-interval, so an actual random pick would change every pill
+# several times a minute. Hashing binds the colour to the session instead, so it
+# survives other sessions being created or killed -- the same property that
+# makes the numbers worth memorising.
+#
+# Hashed on the name, not the id: ids are handed out sequentially ($30, $32,
+# $33) and would cluster into neighbouring palette slots. Renaming a session
+# recolours it, which is rare and arguably right.
+#
+#   ts_color_for <name> <palette>
+ts_color_for() {
+  ts_color__name=$1
+  # shellcheck disable=SC2086
+  set -- ${2:-${TS_PALETTE}}
+  ts_color__n=$#
+  if [ "${ts_color__n}" -eq 0 ]; then
+    return 0
+  fi
+  # cksum is POSIX and stable across runs; the value only has to be spread, not
+  # cryptographic.
+  ts_color__h=$(printf '%s' "${ts_color__name}" | cksum | cut -d' ' -f1)
+  ts_color__i=$((ts_color__h % ts_color__n + 1))
+  eval "printf '%s' \"\${${ts_color__i}}\""
+}
+
+# Render one pill.  ts_pill <text> <colour> <text-fg>
+#
+# The caps use bg=default so they inherit whatever status-bg actually is. A
+# hardcoded outer background draws a visible halo, and lualine's bar_bg
+# (#01111d) is not this tmux's status-bg (#011627) -- close enough to look like
+# a rendering bug rather than a mismatch.
+ts_pill() {
+  printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
+    "$2" "${TS_CAP_LEFT}" "$3" "$2" "$1" "$2" "${TS_CAP_RIGHT}"
+}
+
 # Read a tmux user option, with a default.
 #
 #   ts_opt sessions_max 9

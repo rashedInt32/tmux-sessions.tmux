@@ -4,8 +4,13 @@ Your tmux sessions, numbered, in the status bar. `<prefix>` then a digit jumps t
 one — from any pane, whatever is running in it.
 
 ```
- packages                          1 main  2 effective-tutorial  3 solo-effect  4 packages
+ ( 4 packages )        ( 1 main )  ( 2 effective-tutorial )  ( 3 solo-effect )  ( 5 fiberWatch )
+   status-left                              status-right
 ```
+
+(`(` and `)` stand for the half-circle caps, which do not survive a plain-text
+README. Each pill is a different colour; the current session sits on the left,
+and the list keeps its number, so the gap at 4 is deliberate.)
 
 - **Stable numbers.** Ordered by creation time, so a new session always appends.
   `<prefix> 3` is the same session tomorrow.
@@ -53,6 +58,12 @@ Set before the `run-shell` line.
 | `@sessions_key_table` | `prefix` | or `root`, for a modifier chord with no prefix |
 | `@sessions_key_prefix` | *(empty)* | modifier prepended to each digit |
 | `@sessions_last_key` | `0` | `switch-client -l` |
+| `@sessions_style` | `pill` | or `plain` for flat text, no Nerd Font needed |
+| `@sessions_current_position` | `left` | or `inline` to keep it in the list |
+| `@sessions_colors` | 8 oldworld colours | palette the session name hashes into |
+| `@sessions_current_color` | `#90b99f` | fixed colour for the current pill |
+| `@sessions_pill_fg` | `#131314` | text colour inside a pill |
+| `@sessions_pill_left` / `_right` | `` / `` | cap glyphs |
 | `@sessions_max` | `9` | past this, collapse to `+N` |
 | `@sessions_name_width` | `0` | `0` = untruncated, else a cap in characters |
 | `@sessions_separator` | two spaces | between entries |
@@ -60,7 +71,8 @@ Set before the `run-shell` line.
 | `@sessions_current_format` | see below | the session you are in |
 | `@sessions_more_format` | `#[fg=#6b6772]+%d#[default]` | the overflow marker |
 | `@sessions_status` | `on` | `off` to place the segment yourself |
-| `@sessions_status_length` | `200` | raises `status-right-length` if lower |
+| `@sessions_status_length` | `300` | raises `status-right-length` if lower |
+| `@sessions_status_left_length` | `60` | raises `status-left-length` if lower |
 | `@sessions_hooks` | `on` | `off` to rely on `status-interval` alone |
 
 Formats are `printf` patterns taking the index and the name:
@@ -98,6 +110,34 @@ that from your **keyboard layout** — Ghostty, for instance, defaults
 any other layout the keypress becomes a Unicode character and tmux never sees
 it, so the binding silently does nothing. That is why the prefix table is the
 default.
+
+### Colours
+
+Each session's colour comes from a **hash of its name**, not a random pick. The
+bar re-renders on every hook and every `status-interval`, so a real random
+choice would change every pill several times a minute.
+
+Hashing binds the colour to the session: it survives other sessions being
+created or killed, the same way the numbers do. Renaming a session recolours it.
+
+With 8 colours and 5+ sessions two pills can land on the same colour. That is
+accepted — the number is the identifier, the colour is decoration. Widen the
+palette if it bothers you:
+
+```tmux
+set -g @sessions_colors '#92a2d5 #90b99f #e29eca #f5a191 #aca1cf #85b5ba #e6b99d #ea83a5'
+```
+
+The caps use `bg=default` so they inherit your real `status-bg`. Hardcoding a
+background draws a visible halo around every pill.
+
+### No Nerd Font?
+
+```tmux
+set -g @sessions_style plain
+```
+
+Flat text, no cap glyphs, byte-identical to the pre-pill rendering.
 
 ### Placing the segment yourself
 

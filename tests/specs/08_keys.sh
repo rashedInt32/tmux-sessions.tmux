@@ -61,7 +61,7 @@ it "the ninth key resolves index 9, not a hardcoded session"
 contains "$(binds)" "switch.sh 9"
 
 it "raises status-right-length from the 40 default"
-contains "$(cat "${STUB_LOG}")" "set-option -g status-right-length 200"
+contains "$(cat "${STUB_LOG}")" "set-option -g status-right-length 300"
 
 it "sets status-right to our segment with the client's session"
 contains "$(cat "${STUB_LOG}")" 'set-option -g status-right #('
@@ -119,3 +119,30 @@ it "but still binds the keys"
 eq "9" "$(binds | grep -c 'switch.sh' | tr -d ' ')"
 teardown_stub
 unset TS_OPT_sessions_status TS_OPT_sessions_hooks
+
+# --------------------------------------------------- current session on left
+
+setup_stub
+TS_OPT_sessions_hooks=off
+export TS_OPT_sessions_hooks
+"${ENTRY}" >/dev/null 2>&1
+
+it "places the current session's pill in status-left"
+contains "$(cat "${STUB_LOG}")" "set-option -g status-left"
+
+it "the left segment asks for only the current session"
+contains "$(cat "${STUB_LOG}")" '--current)'
+
+it "raises status-left-length too, since a pill is wider than a bare name"
+contains "$(cat "${STUB_LOG}")" "set-option -g status-left-length 60"
+teardown_stub
+
+setup_stub
+TS_OPT_sessions_current_position=inline
+export TS_OPT_sessions_current_position
+"${ENTRY}" >/dev/null 2>&1
+
+it "current_position = inline leaves status-left alone entirely"
+eq "0" "$(grep -c 'set-option -g status-left' "${STUB_LOG}" | tr -d ' ')"
+teardown_stub
+unset TS_OPT_sessions_current_position TS_OPT_sessions_hooks

@@ -38,6 +38,11 @@ pill_fg=$(ts_opt sessions_pill_fg '#131314')
 current_color=$(ts_opt sessions_current_color '#ffffff')
 more_color=$(ts_opt sessions_more_color '#6c6874')
 
+# The index badge. `off` goes back to a plain "N name" pill.
+badge=$(ts_opt sessions_badge on)
+badge_color=$(ts_opt sessions_badge_color '#ffffff')
+badge_fg=$(ts_opt sessions_badge_fg '#131314')
+
 fmt=$(ts_opt sessions_format '#[fg=#f5d76e]%d#[fg=#9f9ca6] %s#[default]')
 cur_fmt=$(ts_opt sessions_current_format '#[fg=#7fe08a]%d %s#[default]')
 more_fmt=$(ts_opt sessions_more_format '#[fg=#6b6772]+%d#[default]')
@@ -124,7 +129,9 @@ if [ "${mode}" != 'current' ] && [ "${client_width}" -gt 0 ]; then
       idx=${r%%"${TAB}"*}
       lbl=${r##*"${TAB}"}
       n=$((n + 1))
+      # 4 cells of pill chrome, plus 2 more for the badge's own caps.
       used=$((used + $(printf '%s %s' "$idx" "$lbl" | wc -m | tr -d ' ') + 4))
+      [ "${badge}" = 'on' ] && used=$((used + 2))
       [ "$n" -gt 1 ] && used=$((used + ${#sep}))
     done
     IFS=$OLDIFS
@@ -178,7 +185,12 @@ for r in $rows; do
       fi
       used_colors="${used_colors} ${color}"
     fi
-    append "$(ts_pill "${idx} ${label}" "${color}" "${pill_fg}")"
+    if [ "${badge}" = 'on' ]; then
+      bc=$(ts_badge_color "${badge_color}" "${color}" "${pill_fg}")
+      append "$(ts_pill_badge "${idx}" "${label}" "${color}" "${pill_fg}" "${bc}" "${badge_fg}")"
+    else
+      append "$(ts_pill "${idx} ${label}" "${color}" "${pill_fg}")"
+    fi
   fi
 done
 IFS=$OLDIFS

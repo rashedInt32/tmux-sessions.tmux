@@ -13,6 +13,18 @@ CAP_R=$(printf '\356\202\264')
 
 count_of() { printf '%s' "$2" | awk -v s="$1" '{n=0; i=1; while ((p=index(substr($0,i),s))>0) {n++; i+=p} print n}'; }
 
+# Assertions read against what actually lands on screen: directives and cap
+# glyphs stripped. Matching escape internals broke the moment the index moved
+# into its own badge, even though the rendering was correct.
+visible() { printf '%s' "$1" | sed "s/#\\[[^]]*\\]//g; s/${CAP_L}//g; s/${CAP_R}//g"; }
+
+# One pill == one outer cap, which is the only cap drawn on the bar background.
+# The badge nests a second pair inside, on the pill's own background.
+pills() { printf '%s' "$1" | grep -o "bg=default\\]${CAP_L}" | wc -l | tr -d ' '; }
+
+# The colour of each pill body, taken from its outer cap.
+pill_colors() { printf '%s' "$1" | grep -o "fg=#[0-9a-f]\\{6\\},bg=default\\]${CAP_L}" | sed 's/fg=//;s/,.*//'; }
+
 fixture "$(
   line '$0' 1000 main
   line '$30' 2000 api
@@ -31,16 +43,39 @@ eq "${CAP_L}" "${TS_CAP_LEFT}"
 eq "${CAP_R}" "${TS_CAP_RIGHT}"
 
 it "every pill gets a left cap and a right cap"
-# Four sessions, current is inline, so four pills.
+# Four sessions, current is inline, so four pills. The badge nests a second cap
+# pair inside each, so the raw glyph count is twice the pill count.
 out=$(TS_OPT_sessions_current_position=inline "${LIST}" '$30')
-eq "4" "$(count_of "${CAP_L}" "${out}")"
-eq "4" "$(count_of "${CAP_R}" "${out}")"
+eq "4" "$(pills "${out}")"
+eq "8" "$(count_of "${CAP_L}" "${out}")"
+eq "8" "$(count_of "${CAP_R}" "${out}")"
 
-it "a pill has the exact escape shape, caps on the outside of the colour"
+it "a badged pill nests a second cap pair inside the first"
+# The badge is the pill's own caps one layer in, so it inherits the radius
+# rather than approximating it with a circled-number glyph -- which this font
+# does not carry (no U+2776.., U+2460.. or U+278A..).
 out=$(TS_OPT_sessions_colors='#abcdef' TS_OPT_sessions_current_position=inline \
-  TS_OPT_sessions_max=1 TS_OPT_sessions_pill_fg='#111111' "${LIST}" '$99')
-eq "#[fg=#abcdef,bg=default]${CAP_L}#[fg=#111111,bg=#abcdef,bold] 1 main #[fg=#abcdef,bg=default,nobold]${CAP_R}#[default]#[fg=#6c6874,bg=default]${CAP_L}#[fg=#111111,bg=#6c6874,bold] +3 #[fg=#6c6874,bg=default,nobold]${CAP_R}#[default]" \
-  "$(printf '%s' "$out" | sed "s/  //g")"
+  TS_OPT_sessions_max=1 TS_OPT_sessions_pill_fg='#111111' \
+  TS_OPT_sessions_badge_color='#ffffff' TS_OPT_sessions_badge_fg='#222222' "${LIST}" '$99')
+eq "#[fg=#abcdef,bg=default]${CAP_L}#[fg=#ffffff,bg=#abcdef]${CAP_L}#[fg=#222222,bg=#ffffff,bold]1#[fg=#ffffff,bg=#abcdef,nobold]${CAP_R}#[fg=#111111,bg=#abcdef,bold] main #[fg=#abcdef,bg=default,nobold]${CAP_R}#[default]" \
+  "$(printf '%s' "$out" | sed 's/  #\[fg=#6c6874.*//')"
+
+it "badge = off goes back to a flat pill with the number inline"
+out=$(TS_OPT_sessions_badge=off TS_OPT_sessions_colors='#abcdef' \
+  TS_OPT_sessions_current_position=inline TS_OPT_sessions_max=1 \
+  TS_OPT_sessions_pill_fg='#111111' "${LIST}" '$99')
+contains "$out" "#[fg=#111111,bg=#abcdef,bold] 1 main #["
+
+it "the badge never takes the pill's own colour, or it would vanish into it"
+# The current session's pill is white by default, and so is the badge.
+out=$(TS_OPT_sessions_current_color='#ffffff' TS_OPT_sessions_badge_color='#ffffff' \
+  TS_OPT_sessions_current_position=inline TS_OPT_sessions_pill_fg='#111111' "${LIST}" 'main')
+not_contains "$out" '#[fg=#ffffff,bg=#ffffff]'
+
+it "a badge colour that differs from the pill is left alone"
+eq '#ffffff' "$(ts_badge_color '#ffffff' '#abcdef' '#111111')"
+it "a badge colour equal to the pill falls back to the text colour"
+eq '#111111' "$(ts_badge_color '#ffffff' '#ffffff' '#111111')"
 
 # ---------------------------------------------------------------- the colours
 
@@ -97,18 +132,18 @@ fixture "$(
 
 it "the current session is left out of the list when it lives on the left"
 out=$("${LIST}" '$32')
-not_contains "$out" "3 dotfiles"
+not_contains "$(visible "$out")" "3 dotfiles"
 
 it "the others keep their global numbers, gap included"
 out=$("${LIST}" '$32')
-contains "$out" "1 main"
-contains "$out" "2 api"
-contains "$out" "4 notes"
+contains "$(visible "$out")" "1 main"
+contains "$(visible "$out")" "2 api"
+contains "$(visible "$out")" "4 notes"
 
 it "--current renders exactly one pill"
 out=$("${LIST}" '$32' --current)
-eq "1" "$(count_of "${CAP_L}" "${out}")"
-contains "$out" "3 dotfiles"
+eq "1" "$(pills "${out}")"
+contains "$(visible "$out")" "3 dotfiles"
 
 it "--current uses the fixed current colour, not the hash"
 contains "$("${LIST}" '$32' --current)" '#ffffff'
@@ -120,21 +155,24 @@ it "--current is empty when the client is in no known session"
 eq "" "$("${LIST}" '$999' --current)"
 
 it "current_position = inline keeps it in the list and off the left"
-contains "$(TS_OPT_sessions_current_position=inline "${LIST}" '$32')" "3 dotfiles"
+contains "$(visible "$(TS_OPT_sessions_current_position=inline "${LIST}" '$32')")" "3 dotfiles"
 
 # -------------------------------------------------------------- overflow, misc
 
 it "the overflow marker is a pill too, not bare text"
 out=$(TS_OPT_sessions_max=2 TS_OPT_sessions_current_position=inline "${LIST}" '$99')
 contains "$out" "${CAP_L}"
-contains "$out" " +2 "
+contains "$(visible "$out")" "+2"
 
 it "a hostile name is still escaped inside a pill"
 fixture "$(
   line '$1' 1000 '#[fg=red]evil'
 )"
 out=$(TS_OPT_sessions_current_position=inline "${LIST}" '$99')
-contains "$out" '1 ##[fg=red]evil'
+# Asserted on the raw segment, not the visible text: visible() strips #[...]
+# runs, which would eat the escaped "##[fg=red]" down to a bare "#" and make a
+# correctly escaped name look unescaped.
+contains "$out" '##[fg=red]evil'
 
 it "plain style emits no caps at all"
 out=$(TS_OPT_sessions_style=plain TS_OPT_sessions_current_position=inline "${LIST}" '$99')
@@ -153,16 +191,16 @@ it "the current session is recognised when given a NAME"
 # Verified on 3.7c: a client in `packages` reports client_session=packages while
 # session_id is $3. Every earlier spec handed in an id, so the production path
 # was never exercised and the highlight silently never fired.
-not_contains "$("${LIST}" 'packages')" "2 packages"
+not_contains "$(visible "$("${LIST}" 'packages')")" "2 packages"
 
 it "--current by name renders that session's pill"
-contains "$("${LIST}" 'packages' --current)" "2 packages"
+contains "$(visible "$("${LIST}" 'packages' --current)")" "2 packages"
 
 it "the current session is still recognised when given an id"
-not_contains "$("${LIST}" '$3')" "2 packages"
+not_contains "$(visible "$("${LIST}" '$3')")" "2 packages"
 
 it "a name matching nothing leaves every session in the list"
-contains "$("${LIST}" 'nosuchsession')" "2 packages"
+contains "$(visible "$("${LIST}" 'nosuchsession')")" "2 packages"
 
 it "an empty current marks nothing as current"
 eq "" "$("${LIST}" '' --current)"
@@ -180,11 +218,11 @@ fixture "$(
 vis() { printf '%s' "$1" | sed 's/#\[[^]]*\]//g' | wc -m | tr -d ' '; }
 
 it "with no width given, nothing is dropped"
-eq "5" "$(count_of "${CAP_L}" "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9')")"
+eq "5" "$(pills "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9')")"
 
 it "a narrow client drops the tail instead of overflowing"
 out=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_reserve=10 "${LIST}" '$9' list 60)
-n=$(count_of "${CAP_L}" "$out")
+n=$(pills "$out")
 if [ "$n" -lt 5 ] && [ "$n" -ge 1 ]; then pass; else fail "expected some dropped, got $n pills"; fi
 
 it "what survives actually fits the budget"
@@ -203,13 +241,13 @@ out=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_reserve=10 "${LIST
 if [ -n "$out" ]; then pass; else fail "rendered nothing at all"; fi
 
 it "a wide client keeps every session"
-eq "5" "$(count_of "${CAP_L}" "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9' list 400)")"
+eq "5" "$(pills "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9' list 400)")"
 
 it "a non-numeric width is ignored rather than breaking arithmetic"
-eq "5" "$(count_of "${CAP_L}" "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9' list bogus)")"
+eq "5" "$(pills "$(TS_OPT_sessions_current_position=inline "${LIST}" '$9' list bogus)")"
 
 it "--current is never trimmed for width"
-contains "$("${LIST}" 'alpha-session' current 20)" "1 alpha-session"
+contains "$(visible "$("${LIST}" 'alpha-session' current 20)")" "1 alpha-session"
 
 # ------------------------------------------------------------- the palette
 
@@ -241,7 +279,7 @@ fixture "$(
   line '$5' 5000 echo-sess
 )"
 out=$(TS_OPT_sessions_current_position=inline "${LIST}" '$9')
-distinct=$(printf '%s' "$out" | grep -o 'bg=#[0-9a-f]\{6\},bold' | sort -u | wc -l | tr -d ' ')
+distinct=$(pill_colors "$out" | sort -u | wc -l | tr -d ' ')
 if [ "$distinct" -ge 3 ]; then pass; else fail "only $distinct distinct pill colours across 5 sessions"; fi
 
 it "a shell with IFS=newline still gets a single colour back, not the palette"
@@ -262,14 +300,14 @@ fixture "$(
   line '$6' 6000 notes
 )"
 out=$(TS_OPT_sessions_current_position=inline "${LIST}" '$99')
-total=$(printf '%s' "$out" | grep -o 'bg=#[0-9a-f]\{6\},bold' | wc -l | tr -d ' ')
-uniq=$(printf '%s' "$out" | grep -o 'bg=#[0-9a-f]\{6\},bold' | sort -u | wc -l | tr -d ' ')
+total=$(pill_colors "$out" | wc -l | tr -d ' ')
+uniq=$(pill_colors "$out" | sort -u | wc -l | tr -d ' ')
 eq "$total" "$uniq" "all $total pills should have distinct colours"
 
 it "more sessions than colours still renders, reusing rather than failing"
 fixture "$(for i in 1 2 3 4 5 6 7 8 9 10 11 12; do line "\$$i" "$((1000 + i))" "sess$i"; done)"
 out=$(TS_OPT_sessions_max=12 TS_OPT_sessions_current_position=inline "${LIST}" '$99')
-eq "12" "$(count_of "${CAP_L}" "$out")"
+eq "12" "$(pills "$out")"
 
 it "unique_colors = off leaves the raw hash in place"
 fixture "$(
@@ -278,5 +316,5 @@ fixture "$(
 )"
 a=$(TS_OPT_sessions_unique_colors=off TS_OPT_sessions_current_position=inline "${LIST}" '$99')
 # main and solo-effect both hash to the same slot, so with probing off they match.
-total=$(printf '%s' "$a" | grep -o 'bg=#[0-9a-f]\{6\},bold' | sort -u | wc -l | tr -d ' ')
+total=$(pill_colors "$a" | sort -u | wc -l | tr -d ' ')
 eq "1" "$total"

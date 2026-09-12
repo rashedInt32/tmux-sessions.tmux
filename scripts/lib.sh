@@ -114,6 +114,41 @@ ts_free_color() {
   printf '%s' "${ts_free__want}"
 }
 
+# Render a pill with the index in a rounded badge against the left edge.
+#
+#   ts_pill_badge <index> <label> <pill> <text-fg> <badge> <badge-fg>
+#
+#   ( ⬤3  solo-effect )   -- badge caps nested inside the pill caps
+#
+# Built from the same half circles as the pill itself, one layer in, so the
+# badge picks up the pill's radius instead of approximating it. The obvious
+# alternative -- a circled-number glyph such as ❶ (U+2776) or ① (U+2460) -- was
+# ruled out by checking the font: JetBrainsMono Nerd Font carries none of
+# U+2776.., U+2460.. or U+278A.., so they would all render as tofu. U+E0B6 and
+# U+E0B4 are present.
+#
+# A terminal cell is one fixed size, so the digit cannot be set smaller. The
+# badge is what makes it read as smaller.
+ts_pill_badge() {
+  printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s]%s#[fg=%s,bg=%s,bold]%s#[fg=%s,bg=%s,nobold]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
+    "$3" "${TS_CAP_LEFT}" \
+    "$5" "$3" "${TS_CAP_LEFT}" \
+    "$6" "$5" "$1" \
+    "$5" "$3" "${TS_CAP_RIGHT}" \
+    "$4" "$3" "$2" \
+    "$3" "${TS_CAP_RIGHT}"
+}
+
+# A badge colour that is never the pill's own, or the badge vanishes into it.
+# Falls back to the pill's text colour, which is chosen to contrast with it.
+ts_badge_color() {
+  if [ "$1" = "$2" ]; then
+    printf '%s' "$3"
+  else
+    printf '%s' "$1"
+  fi
+}
+
 # Render one pill.  ts_pill <text> <colour> <text-fg>
 #
 # The caps use bg=default so they inherit whatever status-bg actually is. A

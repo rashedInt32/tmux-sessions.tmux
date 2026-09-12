@@ -29,6 +29,55 @@ TS_CAP_RIGHT=$(printf '\356\202\264')
 # count and five or six sessions is normal.
 TS_PALETTE='#ff6188 #fc9867 #ffd866 #a9dc76 #78dce8 #ab9df2 #ff79c6 #7bd88f #f8a5c2 #6ec7ff'
 
+# Drop palette entries too close in hue to a reserved colour.
+#
+#   ts_palette_excluding <reserved> <palette> [min-degrees]
+#
+# Choosing the current session's colour from the largest hue gap was not enough.
+# The palette's ten colours leave one 76-degree gap, so its midpoint sits only
+# 38 degrees from each neighbour -- and #df65ff against #ff79c6 measured a CIE76
+# deltaE of 41, close enough that the current session and session 1 read as the
+# same colour at a glance.
+#
+# Reserving the neighbourhood fixes it at the source: no session can be assigned
+# a colour near the one that means "here". Ten entries can spare two.
+ts_palette_excluding() {
+  printf '%s' "${2:-${TS_PALETTE}}" | tr ' ' '\n' | awk -v ref="$1" -v lim="${3:-45}" '
+    function hue(hex,   r, g, b, mx, mn, d, h) {
+      r = hx(substr(hex, 2, 2)) / 255
+      g = hx(substr(hex, 4, 2)) / 255
+      b = hx(substr(hex, 6, 2)) / 255
+      mx = r; if (g > mx) mx = g; if (b > mx) mx = b
+      mn = r; if (g < mn) mn = g; if (b < mn) mn = b
+      d = mx - mn
+      if (d == 0) return -1
+      if (mx == r) h = 60 * (((g - b) / d) % 6)
+      else if (mx == g) h = 60 * (((b - r) / d) + 2)
+      else h = 60 * (((r - g) / d) + 4)
+      if (h < 0) h += 360
+      return h
+    }
+    function hx(s,   i, c, n, v) {
+      n = 0
+      for (i = 1; i <= length(s); i++) {
+        c = tolower(substr(s, i, 1))
+        v = index("0123456789abcdef", c) - 1
+        n = n * 16 + v
+      }
+      return n
+    }
+    BEGIN { rh = hue(ref) }
+    NF {
+      h = hue($1)
+      # A greyscale reference has no hue to be near, so nothing is excluded.
+      if (rh < 0 || h < 0) { print $1; next }
+      d = (h > rh) ? h - rh : rh - h
+      if (d > 180) d = 360 - d
+      if (d >= lim) print $1
+    }
+  ' | tr '\n' ' ' | sed 's/ $//'
+}
+
 # Pick a palette colour for a name. Deterministic, not random.
 #
 # "Random colours" means varied, not re-rolled: the bar re-renders on every hook

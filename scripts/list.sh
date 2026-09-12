@@ -42,6 +42,15 @@ pill_fg=$(ts_opt sessions_pill_fg '#131314')
 current_color=$(ts_opt sessions_current_color '#df65ff')
 more_color=$(ts_opt sessions_more_color '#6c6874')
 
+# No session may take a colour near the one that means "here", or the two read
+# as the same at a glance -- which is exactly what happened with the current
+# orchid against session 1's #ff79c6, 38 degrees and a deltaE of 41 apart.
+# 0 disables the reservation.
+reserve_hue=$(ts_opt sessions_reserve_hue 45)
+if [ "${reserve_hue}" -gt 0 ]; then
+  palette=$(ts_palette_excluding "${current_color}" "${palette}" "${reserve_hue}")
+fi
+
 # The index badge. `off` goes back to a plain "N name" pill.
 badge=$(ts_opt sessions_badge on)
 badge_color=$(ts_opt sessions_badge_color '#ffffff')

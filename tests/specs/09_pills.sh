@@ -125,7 +125,9 @@ fixture "$(
   line '$30' 2000 api
   line '$32' 3000 dotfiles
 )"
-killed=$(TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+# reserve_hue off: this is about the hash being stable, not about which colours
+# the current session reserves, and the two use different effective palettes.
+killed=$(TS_OPT_sessions_reserve_hue=0 TS_OPT_sessions_current_position=inline "${LIST}" '$99')
 # 'api' is now pill 1, but its colour is hashed from the name, not the index.
 contains "$killed" "$(ts_color_for api "${TS_PALETTE}")"
 
@@ -322,7 +324,8 @@ fixture "$(
   line '$1' 1000 main
   line '$2' 2000 solo-effect
 )"
-a=$(TS_OPT_sessions_unique_colors=off TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+a=$(TS_OPT_sessions_unique_colors=off TS_OPT_sessions_reserve_hue=0 \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$99')
 # main and solo-effect both hash to the same slot, so with probing off they match.
 total=$(pill_colors "$a" | sort -u | wc -l | tr -d ' ')
 eq "1" "$total"
@@ -529,3 +532,50 @@ contains "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)" ",bold]"
 
 it "the other sessions keep their names unbolded"
 contains "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)" ",nobold] main"
+
+# ------------------------------------------- reserving the current colour's hue
+
+it "palette entries near the reserved hue are dropped"
+full="${TS_PALETTE}"
+kept=$(ts_palette_excluding '#df65ff' "$full" 45)
+eq "10" "$(printf '%s' "$full" | wc -w | tr -d ' ')"
+eq "8" "$(printf '%s' "$kept" | wc -w | tr -d ' ')"
+
+it "the two that measured closest are the two removed"
+# #ff79c6 is 38 degrees away and #ab9df2 37.7; both read as the same colour.
+kept=$(ts_palette_excluding '#df65ff' "${TS_PALETTE}" 45)
+not_contains "$kept" '#ff79c6'
+not_contains "$kept" '#ab9df2'
+contains "$kept" '#a9dc76'
+
+it "a threshold of 0 keeps everything"
+eq "10" "$(ts_palette_excluding '#df65ff' "${TS_PALETTE}" 0 | wc -w | tr -d ' ')"
+
+it "a greyscale reserved colour excludes nothing, having no hue to be near"
+eq "10" "$(ts_palette_excluding '#ffffff' "${TS_PALETTE}" 45 | wc -w | tr -d ' ')"
+eq "10" "$(ts_palette_excluding '#000000' "${TS_PALETTE}" 45 | wc -w | tr -d ' ')"
+
+it "no session is given a colour near the current one, end to end"
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 second
+  line '$3' 3000 third
+  line '$4' 4000 packages
+)"
+out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
+not_contains "$out" '#ff79c6'
+not_contains "$out" '#ab9df2'
+
+it "the current colour itself is never handed to a session"
+out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
+not_contains "$out" '#df65ff'
+
+it "reserve_hue = 0 puts the whole palette back in play"
+fixture "$(for i in 1 2 3 4 5 6 7 8 9; do line "\$$i" "$((1000 + i))" "s$i"; done)"
+all=$(TS_OPT_sessions_reserve_hue=0 TS_OPT_sessions_max=9 TS_OPT_sessions_style=flat \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+lim=$(TS_OPT_sessions_reserve_hue=45 TS_OPT_sessions_max=9 TS_OPT_sessions_style=flat \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+na=$(printf '%s' "$all" | grep -o 'fg=#[0-9a-f]\{6\}' | sort -u | wc -l | tr -d ' ')
+nl=$(printf '%s' "$lim" | grep -o 'fg=#[0-9a-f]\{6\}' | sort -u | wc -l | tr -d ' ')
+if [ "$na" -gt "$nl" ]; then pass; else fail "unreserved $na colours vs reserved $nl"; fi

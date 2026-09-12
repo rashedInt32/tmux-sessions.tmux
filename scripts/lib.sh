@@ -114,24 +114,39 @@ ts_free_color() {
   printf '%s' "${ts_free__want}"
 }
 
-# Render a pill with the index in a rounded badge against the left edge.
+# Render a pill with the index in a rounded badge near the left edge.
 #
-#   ts_pill_badge <index> <label> <pill> <text-fg> <badge> <badge-fg>
+#   ts_pill_badge <index> <label> <pill> <text-fg> <badge> <badge-fg> <pad>
 #
-#   ( ⬤3  solo-effect )   -- badge caps nested inside the pill caps
+#   (  (1) main )   -- badge caps nested inside the pill caps, `pad` spaces in
 #
-# Built from the same half circles as the pill itself, one layer in, so the
-# badge picks up the pill's radius instead of approximating it. The obvious
-# alternative -- a circled-number glyph such as ❶ (U+2776) or ① (U+2460) -- was
-# ruled out by checking the font: JetBrainsMono Nerd Font carries none of
-# U+2776.., U+2460.. or U+278A.., so they would all render as tofu. U+E0B6 and
-# U+E0B4 are present.
+# Two things a terminal cannot do, so that nobody tries again:
 #
-# A terminal cell is one fixed size, so the digit cannot be set smaller. The
-# badge is what makes it read as smaller.
+#   * The badge is not a circle and cannot be. It is three cells wide (cap,
+#     digit, cap) and one cell tall, and a cell is roughly twice as tall as it
+#     is wide, so the shape is a stadium about 1.5 times wider than high. A
+#     circle would need a badge half a cell wide.
+#   * There is no padding above or below it. The status bar is one character
+#     cell tall and the half circles are drawn to fill that cell's full height.
+#     "2-3px" is not expressible; there is no sub-cell geometry to spend.
+#
+# The single-glyph escape from both -- a circled-digit character -- does not
+# exist in this font. Its cmap has 6860 codepoints and not one enclosed digit:
+# no U+2776.., no U+2460.., no U+278A.., and no Material Design
+# numeric-N-circle. Only bare circles with nothing in them.
+#
+# What is adjustable is the horizontal gap, which is whole cells. `pad` spaces
+# sit between the pill's cap and the badge so it is not flush to the edge.
 ts_pill_badge() {
-  printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s]%s#[fg=%s,bg=%s,bold]%s#[fg=%s,bg=%s,nobold]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
+  ts_badge__pad=''
+  ts_badge__i=0
+  while [ "${ts_badge__i}" -lt "${7:-1}" ]; do
+    ts_badge__pad="${ts_badge__pad} "
+    ts_badge__i=$((ts_badge__i + 1))
+  done
+  printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s]%s#[fg=%s,bg=%s]%s#[fg=%s,bg=%s,bold]%s#[fg=%s,bg=%s,nobold]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
     "$3" "${TS_CAP_LEFT}" \
+    "$4" "$3" "${ts_badge__pad}" \
     "$5" "$3" "${TS_CAP_LEFT}" \
     "$6" "$5" "$1" \
     "$5" "$3" "${TS_CAP_RIGHT}" \
@@ -180,7 +195,10 @@ ts_opt() {
     printf '%s' "${ts_opt__v}"
     return 0
   fi
-  if command -v tmux >/dev/null 2>&1; then
+  # TS_NO_TMUX_OPTS makes the lookup hermetic. Without it the suite reads the
+  # developer's own live tmux options, so a `@sessions_name_width` set on their
+  # real server silently changed spec results.
+  if [ -z "${TS_NO_TMUX_OPTS-}" ] && command -v tmux >/dev/null 2>&1; then
     ts_opt__v=$(tmux show-option -gqv "@${ts_opt__name}" 2>/dev/null || true)
     if [ -n "${ts_opt__v}" ]; then
       printf '%s' "${ts_opt__v}"

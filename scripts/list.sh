@@ -42,6 +42,10 @@ more_color=$(ts_opt sessions_more_color '#6c6874')
 badge=$(ts_opt sessions_badge on)
 badge_color=$(ts_opt sessions_badge_color '#ffffff')
 badge_fg=$(ts_opt sessions_badge_fg '#131314')
+# Cells between the pill's cap and the badge. Whole cells -- a terminal has no
+# sub-cell geometry, so this cannot be expressed in pixels, and there is no
+# vertical equivalent at all: the bar is one cell tall.
+badge_pad=$(ts_opt sessions_badge_pad 1)
 
 fmt=$(ts_opt sessions_format '#[fg=#f5d76e]%d#[fg=#9f9ca6] %s#[default]')
 cur_fmt=$(ts_opt sessions_current_format '#[fg=#7fe08a]%d %s#[default]')
@@ -131,7 +135,7 @@ if [ "${mode}" != 'current' ] && [ "${client_width}" -gt 0 ]; then
       n=$((n + 1))
       # 4 cells of pill chrome, plus 2 more for the badge's own caps.
       used=$((used + $(printf '%s %s' "$idx" "$lbl" | wc -m | tr -d ' ') + 4))
-      [ "${badge}" = 'on' ] && used=$((used + 2))
+      [ "${badge}" = 'on' ] && used=$((used + 2 + badge_pad))
       [ "$n" -gt 1 ] && used=$((used + ${#sep}))
     done
     IFS=$OLDIFS
@@ -185,9 +189,12 @@ for r in $rows; do
       fi
       used_colors="${used_colors} ${color}"
     fi
-    if [ "${badge}" = 'on' ]; then
+    # The current session is deliberately left plain. Its pill is already a
+    # different colour from every other, so the badge added nothing but a dark
+    # blob on a light background.
+    if [ "${badge}" = 'on' ] && [ "${is_current}" != yes ]; then
       bc=$(ts_badge_color "${badge_color}" "${color}" "${pill_fg}")
-      append "$(ts_pill_badge "${idx}" "${label}" "${color}" "${pill_fg}" "${bc}" "${badge_fg}")"
+      append "$(ts_pill_badge "${idx}" "${label}" "${color}" "${pill_fg}" "${bc}" "${badge_fg}" "${badge_pad}")"
     else
       append "$(ts_pill "${idx} ${label}" "${color}" "${pill_fg}")"
     fi

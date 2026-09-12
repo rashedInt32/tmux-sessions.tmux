@@ -8,6 +8,11 @@ set -u
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 export ROOT
+
+# Never read the developer's live tmux options. Only the hook specs talk to a
+# real server, and they scope everything to a throwaway session.
+TS_NO_TMUX_OPTS=1
+export TS_NO_TMUX_OPTS
 FILTER=${1-}
 
 PASSED=0

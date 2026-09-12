@@ -47,8 +47,10 @@ it "every pill gets a left cap and a right cap"
 # pair inside each, so the raw glyph count is twice the pill count.
 out=$(TS_OPT_sessions_current_position=inline "${LIST}" '$30')
 eq "4" "$(pills "${out}")"
-eq "8" "$(count_of "${CAP_L}" "${out}")"
-eq "8" "$(count_of "${CAP_R}" "${out}")"
+# Three badged pills carry two cap pairs each; the current session is rendered
+# plain and carries one.
+eq "7" "$(count_of "${CAP_L}" "${out}")"
+eq "7" "$(count_of "${CAP_R}" "${out}")"
 
 it "a badged pill nests a second cap pair inside the first"
 # The badge is the pill's own caps one layer in, so it inherits the radius
@@ -57,7 +59,7 @@ it "a badged pill nests a second cap pair inside the first"
 out=$(TS_OPT_sessions_colors='#abcdef' TS_OPT_sessions_current_position=inline \
   TS_OPT_sessions_max=1 TS_OPT_sessions_pill_fg='#111111' \
   TS_OPT_sessions_badge_color='#ffffff' TS_OPT_sessions_badge_fg='#222222' "${LIST}" '$99')
-eq "#[fg=#abcdef,bg=default]${CAP_L}#[fg=#ffffff,bg=#abcdef]${CAP_L}#[fg=#222222,bg=#ffffff,bold]1#[fg=#ffffff,bg=#abcdef,nobold]${CAP_R}#[fg=#111111,bg=#abcdef,bold] main #[fg=#abcdef,bg=default,nobold]${CAP_R}#[default]" \
+eq "#[fg=#abcdef,bg=default]${CAP_L}#[fg=#111111,bg=#abcdef] #[fg=#ffffff,bg=#abcdef]${CAP_L}#[fg=#222222,bg=#ffffff,bold]1#[fg=#ffffff,bg=#abcdef,nobold]${CAP_R}#[fg=#111111,bg=#abcdef,bold] main #[fg=#abcdef,bg=default,nobold]${CAP_R}#[default]" \
   "$(printf '%s' "$out" | sed 's/  #\[fg=#6c6874.*//')"
 
 it "badge = off goes back to a flat pill with the number inline"
@@ -318,3 +320,27 @@ a=$(TS_OPT_sessions_unique_colors=off TS_OPT_sessions_current_position=inline "$
 # main and solo-effect both hash to the same slot, so with probing off they match.
 total=$(pill_colors "$a" | sort -u | wc -l | tr -d ' ')
 eq "1" "$total"
+
+it "badge_pad puts whole cells between the pill cap and the badge"
+fixture "$(line '$1' 1000 main)"
+one=$(TS_OPT_sessions_badge_pad=1 TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+three=$(TS_OPT_sessions_badge_pad=3 TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+eq "2" "$(( $(printf '%s' "$(visible "$three")" | wc -m) - $(printf '%s' "$(visible "$one")" | wc -m) ))"
+
+it "the current session is rendered plain, with no badge"
+# Out of scope by request: its pill is already a unique colour, so the badge
+# only added a dark blob on a light background.
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 other
+)"
+out=$(TS_OPT_sessions_current_position=inline "${LIST}" 'main')
+# One badged pill (2 cap pairs) + one plain current pill (1 pair) = 3.
+eq "3" "$(count_of "${CAP_L}" "$out")"
+eq "2" "$(pills "$out")"
+
+it "spec options do not leak in from the developer's live tmux"
+# ts_opt falls back to `tmux show-option` when TS_OPT_* is unset, which made the
+# suite read whatever was configured on the real server.
+eq "0" "$(ts_opt sessions_name_width 0)"
+eq "9" "$(ts_opt sessions_max 9)"

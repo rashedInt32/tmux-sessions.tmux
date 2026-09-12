@@ -144,15 +144,29 @@ if [ "${mode}" != 'current' ] && [ "${client_width}" -gt 0 ]; then
       idx=${r%%"${TAB}"*}
       lbl=${r##*"${TAB}"}
       n=$((n + 1))
-      # 4 cells of pill chrome, plus 2 more for the badge's own caps.
-      used=$((used + $(printf '%s %s' "$idx" "$lbl" | wc -m | tr -d ' ') + 4))
-      if [ "${badge}" = 'on' ]; then
-        if [ "${badge_style}" = 'glyph' ]; then
-          used=$((used + 1))
-        else
-          used=$((used + 2 + badge_pad))
+      # Chrome is per style, not a constant. Charging pill chrome for a flat
+      # entry made the estimate drop sessions that would have fit -- visibly so,
+      # since untruncated names then showed FEWER sessions than truncated ones.
+      used=$((used + $(printf '%s %s' "$idx" "$lbl" | wc -m | tr -d ' ')))
+      case "${style}" in
+      flat)
+        : # glyph and space are already counted by the printf above
+        ;;
+      plain)
+        : # the format supplies its own spacing
+        ;;
+      *)
+        # Two caps and two spaces of pill.
+        used=$((used + 4))
+        if [ "${badge}" = 'on' ]; then
+          if [ "${badge_style}" = 'glyph' ]; then
+            used=$((used + 1))
+          else
+            used=$((used + 2 + badge_pad))
+          fi
         fi
-      fi
+        ;;
+      esac
       [ "$n" -gt 1 ] && used=$((used + ${#sep}))
     done
     IFS=$OLDIFS

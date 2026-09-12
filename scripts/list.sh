@@ -35,7 +35,11 @@ position=$(ts_opt sessions_current_position left)
 
 palette=$(ts_opt sessions_colors "${TS_PALETTE}")
 pill_fg=$(ts_opt sessions_pill_fg '#131314')
-current_color=$(ts_opt sessions_current_color '#ffffff')
+# Orchid, at hue 288. Chosen by measuring the palette rather than by eye: its
+# ten colours leave one 76-degree gap, between purple (250) and magenta (326),
+# and this sits in the middle of it. White receded instead of standing out --
+# it was the least saturated thing on a bar of saturated names.
+current_color=$(ts_opt sessions_current_color '#df65ff')
 more_color=$(ts_opt sessions_more_color '#6c6874')
 
 # The index badge. `off` goes back to a plain "N name" pill.
@@ -50,6 +54,9 @@ badge_pad=$(ts_opt sessions_badge_pad 1)
 # otherwise: one filled entry against a row of plain text is what makes "here"
 # read instantly, and an all-flat row loses that for nothing.
 flat_current=$(ts_opt sessions_flat_current text)
+# Cells before the current entry. status-left starts hard against the terminal
+# edge, which reads as clipped rather than aligned.
+left_pad=$(ts_opt sessions_left_pad 2)
 # The current session's number is the one number that is not a key you can
 # press: prefix+4 while already in 4 does nothing. Showing it advertises an
 # action that does not exist, so it is hidden by default. Position carries
@@ -216,7 +223,10 @@ for r in $rows; do
       used_colors="${used_colors} ${color}"
     fi
     if [ "${is_current}" = yes ] && [ "${current_number}" != 'on' ]; then
-      append "$(ts_flat '' "$label" "$color")"
+      append "$(ts_flat '' "$label" "$color" bold)"
+    elif [ "${is_current}" = yes ]; then
+      g=$(ts_badge_glyph "${idx}" "${circle_set}" 2>/dev/null) || g="${idx}"
+      append "$(ts_flat "$g" "$label" "$color" bold)"
     else
       g=$(ts_badge_glyph "${idx}" "${circle_set}" 2>/dev/null) || g="${idx}"
       append "$(ts_flat "$g" "$label" "$color")"
@@ -268,6 +278,16 @@ if [ "${mode}" != 'current' ] && [ "${hidden}" -gt 0 ]; then
   else
     append "$(ts_pill "+${hidden}" "${more_color}" "${pill_fg}")"
   fi
+fi
+
+if [ "${mode}" = 'current' ] && [ -n "$out" ]; then
+  pad=''
+  i=0
+  while [ "$i" -lt "${left_pad}" ]; do
+    pad="${pad} "
+    i=$((i + 1))
+  done
+  out="${pad}${out}"
 fi
 
 printf '%s' "$out"

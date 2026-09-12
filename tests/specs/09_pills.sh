@@ -25,6 +25,8 @@ pills() { printf '%s' "$1" | grep -o "bg=default\\]${CAP_L}" | wc -l | tr -d ' '
 # On-screen width. Strips directives only -- unlike visible(), which also drops
 # the cap glyphs so that text assertions match contiguously. Caps occupy real
 # cells, so measuring width with visible() under-counts every pill by two.
+trim() { printf '%s' "$1" | sed 's/^ *//;s/ *$//'; }
+
 cells() { printf '%s' "$1" | sed 's/#\\[[^]]*\\]//g' | wc -m | tr -d ' '; }
 
 # The colour of each pill body, taken from its outer cap.
@@ -74,7 +76,6 @@ out=$(TS_OPT_sessions_badge=off TS_OPT_sessions_colors='#abcdef' \
 contains "$out" "#[fg=#111111,bg=#abcdef,bold] 1 main #["
 
 it "the badge never takes the pill's own colour, or it would vanish into it"
-# The current session's pill is white by default, and so is the badge.
 out=$(TS_OPT_sessions_current_color='#ffffff' TS_OPT_sessions_badge_color='#ffffff' \
   TS_OPT_sessions_current_position=inline TS_OPT_sessions_pill_fg='#111111' "${LIST}" 'main')
 not_contains "$out" '#[fg=#ffffff,bg=#ffffff]'
@@ -153,7 +154,7 @@ eq "1" "$(pills "${out}")"
 contains "$(visible "$out")" "3 dotfiles"
 
 it "--current uses the fixed current colour, not the hash"
-contains "$("${LIST}" '$32' --current)" '#ffffff'
+contains "$("${LIST}" '$32' --current)" '#df65ff'
 
 it "--current carries no overflow marker, which belongs to the list"
 not_contains "$(TS_OPT_sessions_max=1 "${LIST}" '$0' --current)" "+"
@@ -476,12 +477,14 @@ eq "0" "$(pills "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
 
 it "it carries no number, because that number is not a key you can press"
 out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)
-eq "packages" "$(visible "$out")"
+eq "packages" "$(trim "$(visible "$out")")"
 not_contains "$out" "$(printf '\342\236\213')"
 
 it "and no stray leading space where the glyph would have been"
 # Emitting the separator without the glyph would sit it one cell out of line.
-eq "packages" "$(visible "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
+# left_pad is set to 0 here so only the entry itself is under test.
+eq "packages" "$(visible "$(TS_OPT_sessions_left_pad=0 TS_OPT_sessions_style=flat \
+  "${LIST}" 'packages' current)")"
 
 it "it uses the current colour, not a palette entry"
 contains "$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_color='#abcdef' \
@@ -503,3 +506,26 @@ out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
 contains "$out" "$(printf '\342\236\212')"
 contains "$out" "$(printf '\342\236\214')"
 not_contains "$out" "$(printf '\342\236\213')"
+
+it "the current entry is padded off the terminal edge"
+# status-left starts hard against column 0, which reads as clipped.
+fixture "$(line '$1' 1000 packages)"
+eq "  packages" "$(visible "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
+eq "packages" "$(visible "$(TS_OPT_sessions_left_pad=0 TS_OPT_sessions_style=flat \
+  "${LIST}" 'packages' current)")"
+
+it "the list side is never padded, only the current entry"
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 packages
+)"
+out=$(visible "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)")
+eq "$out" "$(trim "$out")"
+
+it "the current session is bold, which is what separates it from the palette"
+# Ten palette colours already cover every hue family bar one gap, so weight
+# rather than hue is what makes "here" read.
+contains "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)" ",bold]"
+
+it "the other sessions keep their names unbolded"
+contains "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)" ",nobold] main"

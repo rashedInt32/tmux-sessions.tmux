@@ -277,14 +277,20 @@ ts_pill() {
 # The digit glyph is a knockout, so against no fill the circle takes the
 # session's colour and the digit shows the bar through it. That is the same
 # shape as the pill version, just inverted.
+# `bold` (arg 4, optional) marks the current session. Weight, not hue, is what
+# separates it: the palette's ten colours already cover every hue family except
+# a 76-degree gap between purple and magenta, so a colour alone cannot be relied
+# on to stand out against them.
 ts_flat() {
+  ts_flat__w=nobold
+  [ "${4-}" = bold ] && ts_flat__w=bold
   if [ -z "$1" ]; then
     # No glyph: used for the current session, whose number is not a key anyone
     # can press. Without this the leading space would still be emitted and the
     # entry would sit one cell out of line with the rest.
-    printf '#[fg=%s]%s#[default]' "$3" "$2"
+    printf '#[fg=%s,%s]%s#[default]' "$3" "${ts_flat__w}" "$2"
   else
-    printf '#[fg=%s,bold]%s#[fg=%s,nobold] %s#[default]' "$3" "$1" "$3" "$2"
+    printf '#[fg=%s,bold]%s#[fg=%s,%s] %s#[default]' "$3" "$1" "$3" "${ts_flat__w}" "$2"
   fi
 }
 

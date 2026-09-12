@@ -32,18 +32,37 @@ fi
 # ------------------------------------------------------------------- keys
 
 if [ "$(ts_opt sessions_keys on)" = 'on' ]; then
-  prefix=$(ts_opt sessions_key_prefix 'M-')
-  # Root table (-n): no tmux prefix, so a jump is one chord from any pane.
-  # Deliberately not prefix+N, which tmux already binds to select-window.
+  # `prefix` (default) binds into tmux's prefix table, so the keys are
+  # <prefix> 1 .. <prefix> 9. `root` binds with -n for a modifier chord such as
+  # M-1, which is one keystroke fewer but has to get past the terminal first.
+  #
+  # The prefix table is the default because the root table is not reliably
+  # reachable: on macOS, Option only sends Alt when the terminal is configured
+  # for it, and several terminals decide that from the active keyboard layout.
+  # A binding that silently never fires is worse than one extra keystroke.
+  #
+  # Taking the prefix table does override tmux's own <prefix> 0-9
+  # select-window. `<prefix> n` and `<prefix> p` still cycle windows.
+  table=$(ts_opt sessions_key_table prefix)
+  keymod=$(ts_opt sessions_key_prefix '')
+
   i=1
   while [ "${i}" -le 9 ]; do
-    tmux bind-key -n "${prefix}${i}" run-shell -b "${SWITCH} ${i}"
+    if [ "${table}" = 'root' ]; then
+      tmux bind-key -n "${keymod}${i}" run-shell -b "${SWITCH} ${i}"
+    else
+      tmux bind-key "${keymod}${i}" run-shell -b "${SWITCH} ${i}"
+    fi
     i=$((i + 1))
   done
 
-  last=$(ts_opt sessions_last_key 'M-0')
+  last=$(ts_opt sessions_last_key '0')
   if [ -n "${last}" ]; then
-    tmux bind-key -n "${last}" switch-client -l
+    if [ "${table}" = 'root' ]; then
+      tmux bind-key -n "${keymod}${last}" switch-client -l
+    else
+      tmux bind-key "${keymod}${last}" switch-client -l
+    fi
   fi
 fi
 

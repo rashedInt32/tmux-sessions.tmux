@@ -1,17 +1,18 @@
 # tmux-sessions.tmux
 
-Your tmux sessions, numbered, in the status bar. `Alt+N` jumps to one — from any
-pane, whatever is running in it.
+Your tmux sessions, numbered, in the status bar. `<prefix>` then a digit jumps to
+one — from any pane, whatever is running in it.
 
 ```
  packages                          1 main  2 effective-tutorial  3 solo-effect  4 packages
 ```
 
 - **Stable numbers.** Ordered by creation time, so a new session always appends.
-  `Alt+3` is the same session tomorrow.
+  `<prefix> 3` is the same session tomorrow.
 - **Works everywhere.** A shell, `htop`, a build, a dev server. tmux draws the
   status bar regardless of what is running inside the pane.
-- **No prefix.** `Alt+1`–`Alt+9` are one chord. `Alt+0` goes back.
+- **One digit.** `<prefix> 1` .. `<prefix> 9` jump, `<prefix> 0` goes back.
+  Bind them to `Alt+N` instead if your terminal passes Alt through.
 - **Quiet.** Hooks refresh the bar on session create, kill and switch, so there
   is nothing polling between those.
 - **Additive.** It appends to your `status-right` and never overwrites it.
@@ -49,8 +50,9 @@ Set before the `run-shell` line.
 | Option | Default | Effect |
 |---|---|---|
 | `@sessions_keys` | `on` | `off` to bind nothing |
-| `@sessions_key_prefix` | `M-` | gives `M-1` .. `M-9` |
-| `@sessions_last_key` | `M-0` | `switch-client -l` |
+| `@sessions_key_table` | `prefix` | or `root`, for a modifier chord with no prefix |
+| `@sessions_key_prefix` | *(empty)* | modifier prepended to each digit |
+| `@sessions_last_key` | `0` | `switch-client -l` |
 | `@sessions_max` | `9` | past this, collapse to `+N` |
 | `@sessions_name_width` | `0` | `0` = untruncated, else a cap in characters |
 | `@sessions_separator` | two spaces | between entries |
@@ -72,17 +74,30 @@ Colours match [tmux-sessions.nvim](https://github.com/rashedInt32/tmux-sessions.
 and [claude-sessions.nvim](https://github.com/rashedInt32/claude-sessions.nvim),
 so all three read as one system.
 
-### If `Alt+N` is taken
+### Which keys
 
-Many terminals use `Alt`+digit for tab switching and will swallow it before tmux
-sees it. Either rebind it in your terminal, or use a different prefix:
+The default binds into tmux's **prefix table**: `<prefix> 1` through
+`<prefix> 9`, and `<prefix> 0` for the previous session.
+
+This overrides tmux's own `<prefix> 0`–`9` `select-window`. `<prefix> n` and
+`<prefix> p` still cycle windows, so the cost is only selecting a window *by
+number*.
+
+For a single chord with no prefix, use the root table:
 
 ```tmux
-set -g @sessions_key_prefix 'C-'    # Ctrl+1 .. Ctrl+9
+set -g @sessions_key_table root
+set -g @sessions_key_prefix 'M-'    # Alt+1 .. Alt+9
+set -g @sessions_last_key   '0'     # Alt+0
 ```
 
-Note that tmux binds `prefix` + `0`–`9` to `select-window` by default, so a
-prefix-based scheme means giving that up.
+Be aware that `Alt` is not reliably deliverable. On macOS the Option key only
+sends Alt when the terminal is configured for it, and terminals often decide
+that from your **keyboard layout** — Ghostty, for instance, defaults
+`macos-option-as-alt` on only for *U.S. Standard* and *U.S. International*. On
+any other layout the keypress becomes a Unicode character and tmux never sees
+it, so the binding silently does nothing. That is why the prefix table is the
+default.
 
 ### Placing the segment yourself
 

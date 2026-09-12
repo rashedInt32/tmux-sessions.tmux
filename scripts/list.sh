@@ -49,7 +49,12 @@ badge_pad=$(ts_opt sessions_badge_pad 1)
 # The current session stays a filled pill even in flat style, unless told
 # otherwise: one filled entry against a row of plain text is what makes "here"
 # read instantly, and an all-flat row loses that for nothing.
-flat_current=$(ts_opt sessions_flat_current pill)
+flat_current=$(ts_opt sessions_flat_current text)
+# The current session's number is the one number that is not a key you can
+# press: prefix+4 while already in 4 does nothing. Showing it advertises an
+# action that does not exist, so it is hidden by default. Position carries
+# "here" on its own -- that slot only ever holds the current session.
+current_number=$(ts_opt sessions_current_number off)
 # `pill` nests a second cap pair (works everywhere, stadium shaped).
 # `glyph` uses a real circled-digit character, which has margin on every side
 # including above and below -- but relies on terminal font fallback.
@@ -210,8 +215,12 @@ for r in $rows; do
       fi
       used_colors="${used_colors} ${color}"
     fi
-    g=$(ts_badge_glyph "${idx}" "${circle_set}" 2>/dev/null) || g="${idx}"
-    append "$(ts_flat "$g" "$label" "$color")"
+    if [ "${is_current}" = yes ] && [ "${current_number}" != 'on' ]; then
+      append "$(ts_flat '' "$label" "$color")"
+    else
+      g=$(ts_badge_glyph "${idx}" "${circle_set}" 2>/dev/null) || g="${idx}"
+      append "$(ts_flat "$g" "$label" "$color")"
+    fi
   elif [ "${style}" = 'plain' ]; then
     if [ "${is_current}" = yes ]; then
       # shellcheck disable=SC2059

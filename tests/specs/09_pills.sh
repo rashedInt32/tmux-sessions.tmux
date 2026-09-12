@@ -432,14 +432,16 @@ contains "$out" "$(printf '\342\236\212')"
 distinct=$(printf '%s' "$out" | grep -o 'fg=#[0-9a-f]\{6\}' | sort -u | wc -l | tr -d ' ')
 if [ "$distinct" -ge 2 ]; then pass; else fail "only $distinct colours"; fi
 
-it "the current session stays a filled pill, so 'here' still reads"
+it "flat leaves no pill anywhere, including on the current session"
+# Position already says "here": that slot only ever holds the current session,
+# so a fill on top of it is emphasis the layout has already provided.
 out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_position=inline "${LIST}" 'main')
-eq "1" "$(pills "$out")"
-
-it "flat_current = text drops that too"
-out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_flat_current=text \
-  TS_OPT_sessions_current_position=inline "${LIST}" 'main')
 eq "0" "$(pills "$out")"
+
+it "flat_current = pill brings the filled treatment back"
+out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_flat_current=pill \
+  TS_OPT_sessions_current_position=inline "${LIST}" 'main')
+eq "1" "$(pills "$out")"
 
 it "flat is materially narrower than pill, which is the point"
 fixture "$(
@@ -460,3 +462,44 @@ fixture "$(for i in 1 2 3 4 5 6 7 8 9 10; do line "\$$i" "$((1000 + i))" "s$i"; 
 out=$(TS_OPT_sessions_max=10 TS_OPT_sessions_style=flat \
   TS_OPT_sessions_current_position=inline "${LIST}" '$99')
 contains "$(visible "$out")" "10 s10"
+
+# ------------------------------------------------ the current session, flat
+
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 packages
+  line '$3' 3000 notes
+)"
+
+it "the current session is flat too, with no pill left over"
+eq "0" "$(pills "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
+
+it "it carries no number, because that number is not a key you can press"
+out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)
+eq "packages" "$(visible "$out")"
+not_contains "$out" "$(printf '\342\236\213')"
+
+it "and no stray leading space where the glyph would have been"
+# Emitting the separator without the glyph would sit it one cell out of line.
+eq "packages" "$(visible "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
+
+it "it uses the current colour, not a palette entry"
+contains "$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_color='#abcdef' \
+  "${LIST}" 'packages' current)" '#abcdef'
+
+it "every other session keeps its number"
+out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
+contains "$out" "$(printf '\342\236\212')"
+contains "$out" "$(printf '\342\236\214')"
+
+it "current_number = on puts it back for anyone who wants it"
+contains "$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_number=on \
+  "${LIST}" 'packages' current)" "$(printf '\342\236\213')"
+
+it "numbering elsewhere is unchanged, so the gap still marks where you are"
+# packages is index 2 and sits on the left, so the list runs 1, 3 -- the missing
+# glyph is the gap.
+out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
+contains "$out" "$(printf '\342\236\212')"
+contains "$out" "$(printf '\342\236\214')"
+not_contains "$out" "$(printf '\342\236\213')"

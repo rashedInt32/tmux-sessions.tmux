@@ -278,7 +278,14 @@ ts_pill() {
 # session's colour and the digit shows the bar through it. That is the same
 # shape as the pill version, just inverted.
 ts_flat() {
-  printf '#[fg=%s,bold]%s#[fg=%s,nobold] %s#[default]' "$3" "$1" "$3" "$2"
+  if [ -z "$1" ]; then
+    # No glyph: used for the current session, whose number is not a key anyone
+    # can press. Without this the leading space would still be emitted and the
+    # entry would sit one cell out of line with the rest.
+    printf '#[fg=%s]%s#[default]' "$3" "$2"
+  else
+    printf '#[fg=%s,bold]%s#[fg=%s,nobold] %s#[default]' "$3" "$1" "$3" "$2"
+  fi
 }
 
 # Visible width of a rendered segment: what it costs on screen once tmux has

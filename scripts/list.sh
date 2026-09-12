@@ -46,6 +46,11 @@ badge_fg=$(ts_opt sessions_badge_fg '#131314')
 # sub-cell geometry, so this cannot be expressed in pixels, and there is no
 # vertical equivalent at all: the bar is one cell tall.
 badge_pad=$(ts_opt sessions_badge_pad 1)
+# `pill` nests a second cap pair (works everywhere, stadium shaped).
+# `glyph` uses a real circled-digit character, which has margin on every side
+# including above and below -- but relies on terminal font fallback.
+badge_style=$(ts_opt sessions_badge_style pill)
+circle_color=$(ts_opt sessions_circle_color '#ffffff')
 
 fmt=$(ts_opt sessions_format '#[fg=#f5d76e]%d#[fg=#9f9ca6] %s#[default]')
 cur_fmt=$(ts_opt sessions_current_format '#[fg=#7fe08a]%d %s#[default]')
@@ -135,7 +140,13 @@ if [ "${mode}" != 'current' ] && [ "${client_width}" -gt 0 ]; then
       n=$((n + 1))
       # 4 cells of pill chrome, plus 2 more for the badge's own caps.
       used=$((used + $(printf '%s %s' "$idx" "$lbl" | wc -m | tr -d ' ') + 4))
-      [ "${badge}" = 'on' ] && used=$((used + 2 + badge_pad))
+      if [ "${badge}" = 'on' ]; then
+        if [ "${badge_style}" = 'glyph' ]; then
+          used=$((used + 1))
+        else
+          used=$((used + 2 + badge_pad))
+        fi
+      fi
       [ "$n" -gt 1 ] && used=$((used + ${#sep}))
     done
     IFS=$OLDIFS
@@ -192,7 +203,13 @@ for r in $rows; do
     # The current session is deliberately left plain. Its pill is already a
     # different colour from every other, so the badge added nothing but a dark
     # blob on a light background.
-    if [ "${badge}" = 'on' ] && [ "${is_current}" != yes ]; then
+    if [ "${badge}" = 'on' ] && [ "${is_current}" != yes ] && [ "${badge_style}" = 'glyph' ] &&
+      g=$(ts_pill_glyph "${idx}" "${label}" "${color}" "${pill_fg}" \
+        "$(ts_badge_color "${circle_color}" "${color}" "${pill_fg}")"); then
+      # Only indices 1..9 have a glyph; anything else falls through to the
+      # nested-cap badge rather than losing its number.
+      append "$g"
+    elif [ "${badge}" = 'on' ] && [ "${is_current}" != yes ]; then
       bc=$(ts_badge_color "${badge_color}" "${color}" "${pill_fg}")
       append "$(ts_pill_badge "${idx}" "${label}" "${color}" "${pill_fg}" "${bc}" "${badge_fg}" "${badge_pad}")"
     else

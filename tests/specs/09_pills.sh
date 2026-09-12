@@ -344,3 +344,37 @@ it "spec options do not leak in from the developer's live tmux"
 # suite read whatever was configured on the real server.
 eq "0" "$(ts_opt sessions_name_width 0)"
 eq "9" "$(ts_opt sessions_max 9)"
+
+# ------------------------------------------------- the real circled-digit glyph
+
+it "badge_style = glyph uses a circled-digit character, not nested caps"
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 other
+)"
+out=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+contains "$out" "$(printf '\342\235\266')"
+contains "$out" "$(printf '\342\235\267')"
+
+it "the glyph badge draws no extra caps, so the pill stays one cap pair"
+out=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+eq "2" "$(pills "$out")"
+eq "2" "$(count_of "${CAP_L}" "$out")"
+
+it "the glyph badge is narrower than the nested-cap one"
+g=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+n=$(TS_OPT_sessions_badge_style=pill TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+gw=$(printf '%s' "$(visible "$g")" | wc -m | tr -d ' ')
+nw=$(printf '%s' "$(visible "$n")" | wc -m | tr -d ' ')
+if [ "$gw" -lt "$nw" ]; then pass; else fail "glyph $gw cells vs nested $nw"; fi
+
+it "indices past 9 fall back to the nested badge rather than losing the number"
+fixture "$(for i in 1 2 3 4 5 6 7 8 9 10; do line "\$$i" "$((1000 + i))" "s$i"; done)"
+out=$(TS_OPT_sessions_max=10 TS_OPT_sessions_badge_style=glyph \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+contains "$(visible "$out")" "10 s10"
+
+it "ts_badge_glyph refuses anything outside 1..9"
+status 1 ts_badge_glyph 0
+status 1 ts_badge_glyph 10
+status 1 ts_badge_glyph x

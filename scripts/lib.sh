@@ -154,6 +154,52 @@ ts_pill_badge() {
     "$3" "${TS_CAP_RIGHT}"
 }
 
+# The index as a single circled-digit glyph: U+2776..U+277E.
+#
+#   ts_badge_glyph 3   ->  the character for a filled circle containing 3
+#
+# This is the only way to get what a nested cap pair cannot: a real circle with
+# margin on every side, including above and below. The margin is drawn into the
+# glyph itself, so it does not need sub-cell geometry the terminal has not got.
+#
+# JetBrainsMono Nerd Font does not carry these -- its cmap has 6860 codepoints
+# and no enclosed digits at all -- but 45 other fonts on this machine do, and
+# the terminal falls back per glyph. That fallback is the whole mechanism, so
+# `@sessions_badge_style glyph` is opt-in: on a machine with no such font it
+# would render as tofu.
+#
+# The glyph is a knockout: the circle takes the foreground colour and the digit
+# shows whatever is behind it. So fg is the circle, bg is the digit.
+#
+# Written as octal so the codepoints cannot be mangled in transit, the same way
+# the caps were lost once already.
+ts_badge_glyph() {
+  case "$1" in
+  1) printf '\342\235\266' ;;
+  2) printf '\342\235\267' ;;
+  3) printf '\342\235\270' ;;
+  4) printf '\342\235\271' ;;
+  5) printf '\342\235\272' ;;
+  6) printf '\342\235\273' ;;
+  7) printf '\342\235\274' ;;
+  8) printf '\342\235\275' ;;
+  9) printf '\342\235\276' ;;
+  *) return 1 ;;
+  esac
+}
+
+# Pill with a real circled-digit glyph as the badge.
+#
+#   ts_pill_glyph <index> <label> <pill> <text-fg> <circle>
+ts_pill_glyph() {
+  ts_glyph__g=$(ts_badge_glyph "$1") || return 1
+  printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s,bold]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
+    "$3" "${TS_CAP_LEFT}" \
+    "$5" "$3" "${ts_glyph__g}" \
+    "$4" "$3" "$2" \
+    "$3" "${TS_CAP_RIGHT}"
+}
+
 # A badge colour that is never the pill's own, or the badge vanishes into it.
 # Falls back to the pill's text colour, which is chosen to contrast with it.
 ts_badge_color() {

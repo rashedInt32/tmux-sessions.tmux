@@ -264,6 +264,23 @@ ts_pill() {
     "$2" "${TS_CAP_LEFT}" "$3" "$2" "$1" "$2" "${TS_CAP_RIGHT}"
 }
 
+# Render one entry as coloured text with no filled background.
+#
+#   ts_flat <index-glyph> <label> <colour>
+#
+# The lightest treatment available, for when the bar is reference rather than a
+# thing being acted on. A filled pill is the heaviest, and stacking two rows of
+# them -- lualine above, this below -- gives both the same weight and lets
+# neither win. Colour still carries the session identity and the circled digit
+# still carries the number; only the background goes.
+#
+# The digit glyph is a knockout, so against no fill the circle takes the
+# session's colour and the digit shows the bar through it. That is the same
+# shape as the pill version, just inverted.
+ts_flat() {
+  printf '#[fg=%s,bold]%s#[fg=%s,nobold] %s#[default]' "$3" "$1" "$3" "$2"
+}
+
 # Visible width of a rendered segment: what it costs on screen once tmux has
 # consumed the #[...] directives.
 #

@@ -46,6 +46,10 @@ badge_fg=$(ts_opt sessions_badge_fg '#131314')
 # sub-cell geometry, so this cannot be expressed in pixels, and there is no
 # vertical equivalent at all: the bar is one cell tall.
 badge_pad=$(ts_opt sessions_badge_pad 1)
+# The current session stays a filled pill even in flat style, unless told
+# otherwise: one filled entry against a row of plain text is what makes "here"
+# read instantly, and an all-flat row loses that for nothing.
+flat_current=$(ts_opt sessions_flat_current pill)
 # `pill` nests a second cap pair (works everywhere, stadium shaped).
 # `glyph` uses a real circled-digit character, which has margin on every side
 # including above and below -- but relies on terminal font fallback.
@@ -182,7 +186,19 @@ for r in $rows; do
   rawname=${rest%%"${TAB}"*}
   label=${rest#*"${TAB}"}
 
-  if [ "${style}" = 'plain' ]; then
+  if [ "${style}" = 'flat' ] && { [ "${is_current}" != yes ] || [ "${flat_current}" != 'pill' ]; }; then
+    if [ "${is_current}" = yes ]; then
+      color=${current_color}
+    else
+      color=$(ts_color_for "$rawname" "$palette")
+      if [ "$(ts_opt sessions_unique_colors on)" = 'on' ]; then
+        color=$(ts_free_color "$color" "$used_colors" "$palette")
+      fi
+      used_colors="${used_colors} ${color}"
+    fi
+    g=$(ts_badge_glyph "${idx}" "${circle_set}" 2>/dev/null) || g="${idx}"
+    append "$(ts_flat "$g" "$label" "$color")"
+  elif [ "${style}" = 'plain' ]; then
     if [ "${is_current}" = yes ]; then
       # shellcheck disable=SC2059
       append "$(printf "$cur_fmt" "$idx" "$label")"

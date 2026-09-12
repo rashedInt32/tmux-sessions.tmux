@@ -22,6 +22,11 @@ visible() { printf '%s' "$1" | sed "s/#\\[[^]]*\\]//g; s/${CAP_L}//g; s/${CAP_R}
 # The badge nests a second pair inside, on the pill's own background.
 pills() { printf '%s' "$1" | grep -o "bg=default\\]${CAP_L}" | wc -l | tr -d ' '; }
 
+# On-screen width. Strips directives only -- unlike visible(), which also drops
+# the cap glyphs so that text assertions match contiguously. Caps occupy real
+# cells, so measuring width with visible() under-counts every pill by two.
+cells() { printf '%s' "$1" | sed 's/#\\[[^]]*\\]//g' | wc -m | tr -d ' '; }
+
 # The colour of each pill body, taken from its outer cap.
 pill_colors() { printf '%s' "$1" | grep -o "fg=#[0-9a-f]\\{6\\},bg=default\\]${CAP_L}" | sed 's/fg=//;s/,.*//'; }
 
@@ -325,7 +330,7 @@ it "badge_pad puts whole cells between the pill cap and the badge"
 fixture "$(line '$1' 1000 main)"
 one=$(TS_OPT_sessions_badge_pad=1 TS_OPT_sessions_current_position=inline "${LIST}" '$9')
 three=$(TS_OPT_sessions_badge_pad=3 TS_OPT_sessions_current_position=inline "${LIST}" '$9')
-eq "2" "$(( $(printf '%s' "$(visible "$three")" | wc -m) - $(printf '%s' "$(visible "$one")" | wc -m) ))"
+eq "2" "$(( $(cells "$three") - $(cells "$one") ))"
 
 it "the current session is rendered plain, with no badge"
 # Out of scope by request: its pill is already a unique colour, so the badge
@@ -409,3 +414,49 @@ for set in dingbat sans outline; do
   if ts_badge_glyph 10 "$set" >/dev/null 2>&1; then fail "$set accepted 10"; break; fi
   [ "$set" = outline ] && pass
 done
+
+# --------------------------------------------------------------- flat style
+
+it "flat style draws no caps and no filled background"
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 other
+)"
+out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+eq "0" "$(count_of "${CAP_L}" "$out")"
+not_contains "$out" ",bold] "
+
+it "flat still colours each session and keeps the circled digit"
+out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+contains "$out" "$(printf '\342\236\212')"
+distinct=$(printf '%s' "$out" | grep -o 'fg=#[0-9a-f]\{6\}' | sort -u | wc -l | tr -d ' ')
+if [ "$distinct" -ge 2 ]; then pass; else fail "only $distinct colours"; fi
+
+it "the current session stays a filled pill, so 'here' still reads"
+out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_position=inline "${LIST}" 'main')
+eq "1" "$(pills "$out")"
+
+it "flat_current = text drops that too"
+out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_flat_current=text \
+  TS_OPT_sessions_current_position=inline "${LIST}" 'main')
+eq "0" "$(pills "$out")"
+
+it "flat is materially narrower than pill, which is the point"
+fixture "$(
+  line '$1' 1000 alpha-session
+  line '$2' 2000 beta-session
+  line '$3' 3000 gamma-session
+  line '$4' 4000 delta-session
+)"
+f=$(TS_OPT_sessions_style=flat TS_OPT_sessions_flat_current=text \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+p=$(TS_OPT_sessions_style=pill TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+fw=$(cells "$f")
+pw=$(cells "$p")
+if [ "$((pw - fw))" -ge 20 ]; then pass; else fail "flat $fw vs pill $pw, only $((pw - fw)) saved"; fi
+
+it "an index past 9 falls back to the bare number in flat style too"
+fixture "$(for i in 1 2 3 4 5 6 7 8 9 10; do line "\$$i" "$((1000 + i))" "s$i"; done)"
+out=$(TS_OPT_sessions_max=10 TS_OPT_sessions_style=flat \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+contains "$(visible "$out")" "10 s10"

@@ -44,8 +44,16 @@ TS_PALETTE='#ff6188 #fc9867 #ffd866 #a9dc76 #78dce8 #ab9df2 #ff79c6 #7bd88f #f8a
 #   ts_color_for <name> <palette>
 ts_color_for() {
   ts_color__name=$1
+  ts_color__pal=${2:-${TS_PALETTE}}
+  # IFS is forced back to whitespace for the split. Callers render inside a
+  # `IFS=<newline>` loop, and with that still in effect `set --` treats the
+  # whole palette as one word: every session then lands on entry 1 and the bar
+  # comes out in a single colour.
+  ts_color__ifs=$IFS
+  IFS=' '
   # shellcheck disable=SC2086
-  set -- ${2:-${TS_PALETTE}}
+  set -- ${ts_color__pal}
+  IFS=${ts_color__ifs}
   ts_color__n=$#
   if [ "${ts_color__n}" -eq 0 ]; then
     return 0
@@ -55,6 +63,55 @@ ts_color_for() {
   ts_color__h=$(printf '%s' "${ts_color__name}" | cksum | cut -d' ' -f1)
   ts_color__i=$((ts_color__h % ts_color__n + 1))
   eval "printf '%s' \"\${${ts_color__i}}\""
+}
+
+# First palette colour at or after `preferred` that is not already used.
+#
+#   ts_free_color <preferred> <used-colours> <palette>
+#
+# The hash alone collides: ten colours and six sessions is a coin flip, and two
+# pills in the same colour defeats the reason for colouring them. Probing
+# forward guarantees every visible pill differs while there are colours left.
+#
+# The cost is that a colour is no longer purely a function of the name -- the
+# session that loses a collision moves when the set changes. Only the loser
+# moves, and telling two pills apart matters more than one of them never
+# shifting. Falls back to `preferred` once the palette is exhausted.
+ts_free_color() {
+  ts_free__want=$1
+  ts_free__used=$2
+  ts_free__ifs=$IFS
+  IFS=' '
+  # shellcheck disable=SC2086
+  set -- ${3:-${TS_PALETTE}}
+  IFS=${ts_free__ifs}
+
+  # Start at the preferred colour so the hash still decides where to look.
+  ts_free__start=1
+  ts_free__k=1
+  for ts_free__c in "$@"; do
+    if [ "${ts_free__c}" = "${ts_free__want}" ]; then
+      ts_free__start=${ts_free__k}
+      break
+    fi
+    ts_free__k=$((ts_free__k + 1))
+  done
+
+  ts_free__n=$#
+  ts_free__k=0
+  while [ "${ts_free__k}" -lt "${ts_free__n}" ]; do
+    ts_free__i=$(((ts_free__start - 1 + ts_free__k) % ts_free__n + 1))
+    eval "ts_free__c=\${${ts_free__i}}"
+    case " ${ts_free__used} " in
+    *" ${ts_free__c} "*) ;;
+    *)
+      printf '%s' "${ts_free__c}"
+      return 0
+      ;;
+    esac
+    ts_free__k=$((ts_free__k + 1))
+  done
+  printf '%s' "${ts_free__want}"
 }
 
 # Render one pill.  ts_pill <text> <colour> <text-fg>

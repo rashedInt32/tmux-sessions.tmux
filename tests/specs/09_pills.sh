@@ -228,3 +228,55 @@ b=$(TS_OPT_sessions_current_position=inline TS_OPT_sessions_name_width=6 "${LIST
 ca=$(printf '%s' "$a" | sed -n 's/^#\[fg=\([^,]*\).*/\1/p')
 cb=$(printf '%s' "$b" | sed -n 's/^#\[fg=\([^,]*\).*/\1/p')
 eq "$ca" "$cb"
+
+it "the palette still splits when the caller is inside an IFS=newline loop"
+# Regression: the renderer loops with IFS set to newline, and `set -- $palette`
+# under that IFS treats the whole palette as a single word. Every session then
+# hashed to entry 1 and the entire bar came out one colour.
+fixture "$(
+  line '$1' 1000 alpha
+  line '$2' 2000 bravo
+  line '$3' 3000 charlie
+  line '$4' 4000 delta
+  line '$5' 5000 echo-sess
+)"
+out=$(TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+distinct=$(printf '%s' "$out" | grep -o 'bg=#[0-9a-f]\{6\},bold' | sort -u | wc -l | tr -d ' ')
+if [ "$distinct" -ge 3 ]; then pass; else fail "only $distinct distinct pill colours across 5 sessions"; fi
+
+it "a shell with IFS=newline still gets a single colour back, not the palette"
+old=$IFS
+IFS='
+'
+c=$(ts_color_for "alpha" "${TS_PALETTE}")
+IFS=$old
+eq "1" "$(printf '%s' "$c" | wc -w | tr -d ' ')"
+
+it "two sessions never share a colour while the palette has room"
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 solo-effect
+  line '$3' 3000 packages
+  line '$4' 4000 fiberWatch
+  line '$5' 5000 effect-v4
+  line '$6' 6000 notes
+)"
+out=$(TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+total=$(printf '%s' "$out" | grep -o 'bg=#[0-9a-f]\{6\},bold' | wc -l | tr -d ' ')
+uniq=$(printf '%s' "$out" | grep -o 'bg=#[0-9a-f]\{6\},bold' | sort -u | wc -l | tr -d ' ')
+eq "$total" "$uniq" "all $total pills should have distinct colours"
+
+it "more sessions than colours still renders, reusing rather than failing"
+fixture "$(for i in 1 2 3 4 5 6 7 8 9 10 11 12; do line "\$$i" "$((1000 + i))" "sess$i"; done)"
+out=$(TS_OPT_sessions_max=12 TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+eq "12" "$(count_of "${CAP_L}" "$out")"
+
+it "unique_colors = off leaves the raw hash in place"
+fixture "$(
+  line '$1' 1000 main
+  line '$2' 2000 solo-effect
+)"
+a=$(TS_OPT_sessions_unique_colors=off TS_OPT_sessions_current_position=inline "${LIST}" '$99')
+# main and solo-effect both hash to the same slot, so with probing off they match.
+total=$(printf '%s' "$a" | grep -o 'bg=#[0-9a-f]\{6\},bold' | sort -u | wc -l | tr -d ' ')
+eq "1" "$total"

@@ -142,6 +142,7 @@ fi
 
 # Pass 3 -- render what survived.
 out=''
+used_colors=''
 append() {
   if [ -z "${out}" ]; then out=$1; else out="${out}${sep}$1"; fi
 }
@@ -170,6 +171,12 @@ for r in $rows; do
       color=${current_color}
     else
       color=$(ts_color_for "$rawname" "$palette")
+      # Two pills in the same colour defeats the point of colouring them, so a
+      # collision probes forward to the next free entry.
+      if [ "$(ts_opt sessions_unique_colors on)" = 'on' ]; then
+        color=$(ts_free_color "$color" "$used_colors" "$palette")
+      fi
+      used_colors="${used_colors} ${color}"
     fi
     append "$(ts_pill "${idx} ${label}" "${color}" "${pill_fg}")"
   fi

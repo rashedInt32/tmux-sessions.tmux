@@ -52,3 +52,9 @@ fi
 if [ "$(ts_opt sessions_hooks on)" = 'on' ]; then
   "${dir}/scripts/hooks.sh" install
 fi
+
+# Paint now rather than waiting out status-interval. Nothing here needs a server
+# restart -- options, bindings and hooks all take effect immediately -- but the
+# status line itself only re-evaluates #() on its own schedule, so without this
+# an install looks like it did nothing for up to 15 seconds.
+"${dir}/scripts/refresh.sh"

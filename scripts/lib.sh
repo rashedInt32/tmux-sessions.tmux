@@ -179,10 +179,9 @@ ts_free_color() {
 #     cell tall and the half circles are drawn to fill that cell's full height.
 #     "2-3px" is not expressible; there is no sub-cell geometry to spend.
 #
-# The single-glyph escape from both -- a circled-digit character -- does not
-# exist in this font. Its cmap has 6860 codepoints and not one enclosed digit:
-# no U+2776.., no U+2460.., no U+278A.., and no Material Design
-# numeric-N-circle. Only bare circles with nothing in them.
+# The single-glyph escape from both is a circled-digit character, and the font
+# does carry one: not at any Unicode enclosed-digit block, but in the Material
+# Design range the Nerd Font patcher adds. See ts_badge_glyph.
 #
 # What is adjustable is the horizontal gap, which is whole cells. `pad` spaces
 # sit between the pill's cap and the badge so it is not flush to the edge.
@@ -211,11 +210,19 @@ ts_pill_badge() {
 # margin on every side, including above and below. The margin is drawn into the
 # glyph itself, so it needs no sub-cell geometry the terminal has not got.
 #
-# JetBrainsMono Nerd Font carries none of these -- 6860 codepoints, not one
-# enclosed digit -- but other fonts on the machine do and the terminal falls
-# back per glyph. Which font it lands on decides how the circle looks, and the
-# sets differ sharply because they resolve to different families:
+# JetBrainsMono Nerd Font has no Unicode enclosed digit: no U+2460.., no
+# U+2776.., no U+278A.. It does have Material Design's numeric-N-circle, which
+# the Nerd Font patcher maps into the private use area at U+F0CA0.., and that is
+# the default. Measured in the shipped TTF: advance 600, the same as `A`, so it
+# costs exactly one cell; bounding box 832 tall against a 1320-unit cell, so the
+# margin above and below is drawn into the glyph.
 #
+# The Unicode sets stay available, but they are not in the font. The terminal
+# falls back per glyph and which family it lands on decides how the circle
+# looks, so they differ sharply from each other and from the bar's own font:
+#
+#   nerd     U+F0CA0.. filled, in JetBrainsMono Nerd Font itself -- no fallback
+#   outline-nerd U+F0CA1.. hollow, same range, ring and digit both in the fg
 #   dingbat  U+2776..  filled, 45 fonts, falls back to Hiragino Sans -- a CJK
 #                      family, so the circle is drawn small and tight in the cell
 #   sans     U+278A..  filled, 31 fonts, falls back to Arial Unicode MS -- a
@@ -223,8 +230,7 @@ ts_pill_badge() {
 #   outline  U+2460..  hollow, 56 fonts, digit in the circle colour rather than
 #                      knocked out
 #
-# `sans` is the bigger circle; `dingbat` the tighter one. Neither can be scaled,
-# since a terminal has one font size per cell.
+# None of them can be scaled, since a terminal has one font size per cell.
 #
 # Filled sets are knockouts: the circle takes the foreground colour and the
 # digit shows whatever is behind it, so the digit comes out in the pill's own
@@ -234,7 +240,21 @@ ts_pill_badge() {
 # Written as octal so the codepoints cannot be mangled in transit, the same way
 # the caps were lost once already.
 ts_badge_glyph() {
-  case "${2:-dingbat}" in
+  case "${2:-nerd}" in
+  outline-nerd)
+    case "$1" in
+    1) printf '\363\260\262\241' ;;
+    2) printf '\363\260\262\243' ;;
+    3) printf '\363\260\262\245' ;;
+    4) printf '\363\260\262\247' ;;
+    5) printf '\363\260\262\251' ;;
+    6) printf '\363\260\262\253' ;;
+    7) printf '\363\260\262\255' ;;
+    8) printf '\363\260\262\257' ;;
+    9) printf '\363\260\262\261' ;;
+    *) return 1 ;;
+    esac
+    ;;
   sans)
     case "$1" in
     1) printf '\342\236\212' ;;
@@ -263,7 +283,7 @@ ts_badge_glyph() {
     *) return 1 ;;
     esac
     ;;
-  *)
+  dingbat)
     case "$1" in
     1) printf '\342\235\266' ;;
     2) printf '\342\235\267' ;;
@@ -277,6 +297,20 @@ ts_badge_glyph() {
     *) return 1 ;;
     esac
     ;;
+  *)
+    case "$1" in
+    1) printf '\363\260\262\240' ;;
+    2) printf '\363\260\262\242' ;;
+    3) printf '\363\260\262\244' ;;
+    4) printf '\363\260\262\246' ;;
+    5) printf '\363\260\262\250' ;;
+    6) printf '\363\260\262\252' ;;
+    7) printf '\363\260\262\254' ;;
+    8) printf '\363\260\262\256' ;;
+    9) printf '\363\260\262\260' ;;
+    *) return 1 ;;
+    esac
+    ;;
   esac
 }
 
@@ -284,7 +318,7 @@ ts_badge_glyph() {
 #
 #   ts_pill_glyph <index> <label> <pill> <text-fg> <circle> [set]
 ts_pill_glyph() {
-  ts_glyph__g=$(ts_badge_glyph "$1" "${6:-dingbat}") || return 1
+  ts_glyph__g=$(ts_badge_glyph "$1" "${6:-nerd}") || return 1
   printf '#[fg=%s,bg=default]%s#[fg=%s,bg=%s,bold]%s#[fg=%s,bg=%s,bold] %s #[fg=%s,bg=default,nobold]%s#[default]' \
     "$3" "${TS_CAP_LEFT}" \
     "$5" "$3" "${ts_glyph__g}" \

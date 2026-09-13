@@ -78,8 +78,10 @@ current_number=$(ts_opt sessions_current_number off)
 # including above and below -- but relies on terminal font fallback.
 badge_style=$(ts_opt sessions_badge_style pill)
 circle_color=$(ts_opt sessions_circle_color '#131314')
+# nerd (in JetBrainsMono Nerd Font itself, no fallback) | outline-nerd | and the
+# Unicode sets, which the font lacks and the terminal must fall back for:
 # dingbat (small, CJK fallback) | sans (larger, Latin fallback) | outline
-circle_set=$(ts_opt sessions_circle_set sans)
+circle_set=$(ts_opt sessions_circle_set nerd)
 
 fmt=$(ts_opt sessions_format '#[fg=#f5d76e]%d#[fg=#9f9ca6] %s#[default]')
 cur_fmt=$(ts_opt sessions_current_format '#[fg=#7fe08a]%d %s#[default]')

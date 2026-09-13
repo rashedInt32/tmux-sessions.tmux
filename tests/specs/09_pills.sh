@@ -361,11 +361,12 @@ fixture "$(
   line '$1' 1000 main
   line '$2' 2000 other
 )"
-# Default set is `sans` (U+278A..), which falls back to a Latin font and so
-# draws a fuller circle than the CJK-backed dingbat set.
+# Default set is `nerd` (U+F0CA0..), which JetBrainsMono Nerd Font carries
+# itself, so no font fallback runs and the circle is drawn at the bar's own
+# weight and size.
 out=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_current_position=inline "${LIST}" '$9')
-contains "$out" "$(printf '\342\236\212')"
-contains "$out" "$(printf '\342\236\213')"
+contains "$out" "$(printf '\363\260\262\240')"
+contains "$out" "$(printf '\363\260\262\242')"
 
 it "the glyph badge draws no extra caps, so the pill stays one cap pair"
 out=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_current_position=inline "${LIST}" '$9')
@@ -398,17 +399,26 @@ n=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=sans \
   TS_OPT_sessions_current_position=inline "${LIST}" '$9')
 o=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=outline \
   TS_OPT_sessions_current_position=inline "${LIST}" '$9')
+e=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=outline-nerd \
+  TS_OPT_sessions_current_position=inline "${LIST}" '$9')
 contains "$d" "$(printf '\342\235\266')"
 contains "$n" "$(printf '\342\236\212')"
 contains "$o" "$(printf '\342\221\240')"
+contains "$e" "$(printf '\363\260\262\241')"
 
-it "an unknown set falls back to dingbat rather than losing the digit"
+it "an unknown set falls back to nerd rather than losing the digit"
 u=$(TS_OPT_sessions_badge_style=glyph TS_OPT_sessions_circle_set=nonsense \
   TS_OPT_sessions_current_position=inline "${LIST}" '$9')
-contains "$u" "$(printf '\342\235\266')"
+contains "$u" "$(printf '\363\260\262\240')"
+
+it "the nerd sets cost one cell each, as the font's own metrics promise"
+# advance 600, the same as `A`, so nothing here is double width and the width
+# budget can keep counting the index as one cell.
+eq "1" "$(ts_badge_glyph 1 nerd | wc -m | tr -d ' ')"
+eq "1" "$(ts_badge_glyph 9 outline-nerd | wc -m | tr -d ' ')"
 
 it "every set covers 1..9 and refuses the rest"
-for set in dingbat sans outline; do
+for set in nerd outline-nerd dingbat sans outline; do
   for n in 1 2 3 4 5 6 7 8 9; do
     if [ -z "$(ts_badge_glyph "$n" "$set")" ]; then
       fail "$set has no glyph for $n"
@@ -432,7 +442,7 @@ not_contains "$out" ",bold] "
 
 it "flat still colours each session and keeps the circled digit"
 out=$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_position=inline "${LIST}" '$99')
-contains "$out" "$(printf '\342\236\212')"
+contains "$out" "$(printf '\363\260\262\240')"
 distinct=$(printf '%s' "$out" | grep -o 'fg=#[0-9a-f]\{6\}' | sort -u | wc -l | tr -d ' ')
 if [ "$distinct" -ge 2 ]; then pass; else fail "only $distinct colours"; fi
 
@@ -481,7 +491,7 @@ eq "0" "$(pills "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
 it "it carries no number, because that number is not a key you can press"
 out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)
 eq "packages" "$(trim "$(visible "$out")")"
-not_contains "$out" "$(printf '\342\236\213')"
+not_contains "$out" "$(printf '\363\260\262\242')"
 
 it "and no stray leading space where the glyph would have been"
 # Emitting the separator without the glyph would sit it one cell out of line.
@@ -495,20 +505,20 @@ contains "$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_color='#abcdef' \
 
 it "every other session keeps its number"
 out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
-contains "$out" "$(printf '\342\236\212')"
-contains "$out" "$(printf '\342\236\214')"
+contains "$out" "$(printf '\363\260\262\240')"
+contains "$out" "$(printf '\363\260\262\244')"
 
 it "current_number = on puts it back for anyone who wants it"
 contains "$(TS_OPT_sessions_style=flat TS_OPT_sessions_current_number=on \
-  "${LIST}" 'packages' current)" "$(printf '\342\236\213')"
+  "${LIST}" 'packages' current)" "$(printf '\363\260\262\242')"
 
 it "numbering elsewhere is unchanged, so the gap still marks where you are"
 # packages is index 2 and sits on the left, so the list runs 1, 3 -- the missing
 # glyph is the gap.
 out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
-contains "$out" "$(printf '\342\236\212')"
-contains "$out" "$(printf '\342\236\214')"
-not_contains "$out" "$(printf '\342\236\213')"
+contains "$out" "$(printf '\363\260\262\240')"
+contains "$out" "$(printf '\363\260\262\244')"
+not_contains "$out" "$(printf '\363\260\262\242')"
 
 it "the current entry is padded off the terminal edge"
 # status-left starts hard against column 0, which reads as clipped.

@@ -35,11 +35,13 @@ position=$(ts_opt sessions_current_position left)
 
 palette=$(ts_opt sessions_colors "${TS_PALETTE}")
 pill_fg=$(ts_opt sessions_pill_fg '#131314')
-# Orchid, at hue 288. Chosen by measuring the palette rather than by eye: its
-# ten colours leave one 76-degree gap, between purple (250) and magenta (326),
-# and this sits in the middle of it. White receded instead of standing out --
-# it was the least saturated thing on a bar of saturated names.
-current_color=$(ts_opt sessions_current_color '#df65ff')
+# color_2 from the user's starship `gradient_modern` palette, so the prompt and
+# the bar agree on what "current" looks like. Measured against the alternatives
+# rather than picked by eye: deltaE 100 from the bar background, and the nearest
+# surviving session colour is 62 away once the hue reservation has run.
+# starship's color_6 (#8c6ff0) was the other candidate and loses on both --
+# contrast 80, nearest survivor 51, and it sits beside the palette's own purple.
+current_color=$(ts_opt sessions_current_color '#e28f2a')
 more_color=$(ts_opt sessions_more_color '#6c6874')
 
 # No session may take a colour near the one that means "here", or the two read
@@ -65,7 +67,7 @@ badge_pad=$(ts_opt sessions_badge_pad 1)
 flat_current=$(ts_opt sessions_flat_current text)
 # Cells before the current entry. status-left starts hard against the terminal
 # edge, which reads as clipped rather than aligned.
-left_pad=$(ts_opt sessions_left_pad 2)
+left_pad=$(ts_opt sessions_left_pad 1)
 # The current session's number is the one number that is not a key you can
 # press: prefix+4 while already in 4 does nothing. Showing it advertises an
 # action that does not exist, so it is hidden by default. Position carries

@@ -156,7 +156,7 @@ eq "1" "$(pills "${out}")"
 contains "$(visible "$out")" "3 dotfiles"
 
 it "--current uses the fixed current colour, not the hash"
-contains "$("${LIST}" '$32' --current)" '#df65ff'
+contains "$("${LIST}" '$32' --current)" '#e28f2a'
 
 it "--current carries no overflow marker, which belongs to the list"
 not_contains "$(TS_OPT_sessions_max=1 "${LIST}" '$0' --current)" "+"
@@ -513,7 +513,7 @@ not_contains "$out" "$(printf '\342\236\213')"
 it "the current entry is padded off the terminal edge"
 # status-left starts hard against column 0, which reads as clipped.
 fixture "$(line '$1' 1000 packages)"
-eq "  packages" "$(visible "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
+eq " packages" "$(visible "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' current)")"
 eq "packages" "$(visible "$(TS_OPT_sessions_left_pad=0 TS_OPT_sessions_style=flat \
   "${LIST}" 'packages' current)")"
 
@@ -537,19 +537,19 @@ contains "$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)" ",nobold] mai
 
 it "palette entries near the reserved hue are dropped"
 full="${TS_PALETTE}"
-kept=$(ts_palette_excluding '#df65ff' "$full" 45)
+kept=$(ts_palette_excluding '#e28f2a' "$full" 45)
 eq "10" "$(printf '%s' "$full" | wc -w | tr -d ' ')"
 eq "8" "$(printf '%s' "$kept" | wc -w | tr -d ' ')"
 
 it "the two that measured closest are the two removed"
-# #ff79c6 is 38 degrees away and #ab9df2 37.7; both read as the same colour.
-kept=$(ts_palette_excluding '#df65ff' "${TS_PALETTE}" 45)
-not_contains "$kept" '#ff79c6'
-not_contains "$kept" '#ab9df2'
-contains "$kept" '#a9dc76'
+# The current orange sits at hue 33, beside #fc9867 (20) and #ffd866 (45).
+kept=$(ts_palette_excluding '#e28f2a' "${TS_PALETTE}" 45)
+not_contains "$kept" '#fc9867'
+not_contains "$kept" '#ffd866'
+contains "$kept" '#78dce8'
 
 it "a threshold of 0 keeps everything"
-eq "10" "$(ts_palette_excluding '#df65ff' "${TS_PALETTE}" 0 | wc -w | tr -d ' ')"
+eq "10" "$(ts_palette_excluding '#e28f2a' "${TS_PALETTE}" 0 | wc -w | tr -d ' ')"
 
 it "a greyscale reserved colour excludes nothing, having no hue to be near"
 eq "10" "$(ts_palette_excluding '#ffffff' "${TS_PALETTE}" 45 | wc -w | tr -d ' ')"
@@ -563,12 +563,12 @@ fixture "$(
   line '$4' 4000 packages
 )"
 out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
-not_contains "$out" '#ff79c6'
-not_contains "$out" '#ab9df2'
+not_contains "$out" '#fc9867'
+not_contains "$out" '#ffd866'
 
 it "the current colour itself is never handed to a session"
 out=$(TS_OPT_sessions_style=flat "${LIST}" 'packages' list)
-not_contains "$out" '#df65ff'
+not_contains "$out" '#e28f2a'
 
 it "reserve_hue = 0 puts the whole palette back in play"
 fixture "$(for i in 1 2 3 4 5 6 7 8 9; do line "\$$i" "$((1000 + i))" "s$i"; done)"
